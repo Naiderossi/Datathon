@@ -1,84 +1,52 @@
 ﻿# Datathon Decision - Plataforma de Matching
 
-Plataforma Streamlit para apoiar recrutadores na triagem de talentos, avaliando a aderência candidato/vaga com base em dados estruturados e texto do currículo, além de sugerir candidatos e oportunidades similares. O projeto inclui pipeline completo: pré-processamento, feature engineering, treinamento do modelo MLP + LSA e painel analítico.
+Plataforma interativa para apoiar recrutadores na triagem de talentos, avaliando aderência candidato/vaga com base em dados estruturados e texto do currículo. O app oferece visão executiva, predição de compatibilidade e recomendações de candidatos.
 
-## Estrutura do repositório
+## Acesse o aplicativo
 
-- `app.py` – dashboard executivo (home) com visão geral dos datasets
-- `pages/`
-  - `1_Formulario_e_Predicao.py` – formulário padronizado + predição do candidato
-  - `2_Sugestao_de_Candidatos.py` – módulo de sourcing e recomendações de talentos
-- `talent_matching.py` – lógica compartilhada entre as páginas (triagem e sugestões)
-- `src/` – utilitários, pré-processamento, engenharia de atributos, treino e avaliação
-- `models/` – artefatos serializados (`data_pipeline.joblib`, `model_mlp_lsa.h5`, `thresholds.json`…)
-- `datasets/` – dados brutos (fora do versionamento) e amostras leves para demos
-- `tests/` – ponto de partida para testes automatizados
-- `notebooks/` – espaço reservado para análises exploratórias e experimentos
-- `backup/` – versões anteriores de scripts de interface (referência)
+- [Abrir Datathon Decision no Streamlit](https://SEU-LINK-AQUI.streamlit.app/)  
+  Substitua o link acima pela URL oficial publicada do projeto.
 
-## Requisitos
+## Principais funcionalidades
 
-- Python 3.10 ou 3.11
-- Bibliotecas listadas em `requirements.txt`
+- Panorama executivo com indicadores-chave e filtros rápidos sobre o funil de talentos.  
+- Formulário inteligente para cadastrar ou editar candidatos e obter o score de compatibilidade em tempo real.  
+- Recomendações de candidatos similares à vaga, com análise detalhada de currículo e competências.  
+- Exportação de listas de candidatos para apoiar decisões do time de recrutamento.
 
-Instalação recomendada:
+## Como usar
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+### 1. Home
+- Explore os cards superiores para acompanhar volume de candidatos, vagas e prospects ativos.  
+- Ajuste os filtros laterais para atualizar gráficos e tabelas com dados segmentados.  
+- Utilize as tabelas interativas para ordenar e pesquisar rapidamente informações relevantes.
 
-## Executando a aplicação
+### 2. Formulário e Predição
+- Preencha os campos do candidato (experiência, idiomas, competências). Dados obrigatórios aparecem com indicação visual.  
+- Use as sugestões automáticas de skills para acelerar o preenchimento; basta selecionar na lista exibida.  
+- Clique em **Calcular aderência** para gerar o score e visualizar as competências que mais impactaram o resultado.  
+- Consulte as recomendações de vagas relacionadas geradas na seção inferior.
 
-1. Garanta que os arquivos necessários estejam em `datasets/` e os artefatos do modelo em `models/`.
-2. Ative o ambiente virtual (conforme acima).
-3. Rode a interface multipágina pela raiz do projeto:
+### 3. Sugestão de Candidatos
+- Carregue uma vaga usando JSON/CSV no painel lateral ou selecione uma vaga já listada.  
+- Aplique filtros (nível profissional, PCD, disponibilidade) para refinar o conjunto de talentos sugeridos.  
+- Abra o perfil de cada candidato para visualizar currículo, certificações e histórico de recomendações.  
+- Utilize o botão de exportação para baixar a shortlist filtrada em CSV.
 
-```bash
-streamlit run app.py
-```
+## Dados utilizados
 
-Opcionalmente, `streamlit run app2.py` carrega a página de triagem direta por compatibilidade com versões antigas.
+- Os datasets completos ultrapassam 25 MB e não são versionados no repositório. O app carrega essas informações a partir do armazenamento configurado no deploy.  
+- Para demonstrações ou testes rápidos, utilize os arquivos de `datasets/samples/`, que contêm subconjuntos leves dos dados reais.  
+- Sempre que os dados brutos forem atualizados, execute `python scripts/create_sample_datasets.py` para atualizar as amostras.
 
-- A página “Home” apresenta indicadores, gráficos e tabelas com insights dos três CSVs.
-- A página “Formulário e Predição” reúne o formulário padronizado com sugestões automáticas de competências, predição online e recomendações de vagas relacionadas.
-- A página “Sugestão de Candidatos” permite carregar vagas (JSON ou CSV), filtrar candidatos livres, visualizar currículos e exportar shortlists.
+## Execução local (opcional)
 
-## Treinando o modelo novamente
+1. Crie um ambiente virtual (`python -m venv .venv`) e instale as dependências com `pip install -r requirements.txt`.  
+2. Posicione os datasets completos na pasta `datasets/` (fora do versionamento) ou reutilize as amostras de `datasets/samples/`.  
+3. Rode `streamlit run app.py` na raiz do projeto e acesse `http://localhost:8501` no navegador.  
+4. Para desempenho ideal, mantenha os artefatos do modelo em `models/` (`data_pipeline.joblib`, `model_mlp_lsa.h5`, `thresholds.json`).
 
-O módulo `src/train.py` concentra o fluxo de treinamento (TF-IDF + SVD + MLP). Para recriar os artefatos padrão na pasta `models/`:
+## Suporte
 
-```bash
-python -c "from pathlib import Path; from src.train import train_model; train_model(Path('models'))"
-```
-
-- Utilize os CSVs rotulados presentes em `datasets/`.
-- O treinamento salva `data_pipeline.joblib`, `model_mlp_lsa.h5`, `thresholds.json`, `registry.json` e `training_report.json`.
-- Ajustes adicionais de features podem ser feitos nos módulos `src/preprocessing.py` e `src/feature_engineering.py`.
-
-## Justificativa do modelo de predição
-
-- **Combinação texto + numérico**: o modelo precisa capturar requisitos em linguagem natural e comparar com atributos estruturados dos candidatos. O pipeline TF-IDF + LSA transforma descrições e currículos em vetores densos, preservando semântica mesmo com variações de idioma.
-- **Redução de dimensionalidade**: a decomposição SVD (LSA) reduz ruído e torna o treinamento estável em relação a sinônimos ou termos raros, importante para currículos heterogêneos.
-- **Modelagem não linear**: a MLP (com BatchNorm) aprende interações entre sinais textuais e numéricos (níveis de idioma, PCD, SAP, sobreposição de skills), alcançando melhor desempenho que modelos lineares puros.
-- **Eficiência operacional**: a arquitetura mantém inferência rápida (matrizes densas + rede rasa) e reaproveita o mesmo `data_pipeline.joblib`, simplificando deploy no Streamlit.
-- **Interpretabilidade controlada**: as colunas derivadas (diferença de níveis, overlaps) permanecem disponíveis para explicar o score, enquanto o componente neural agrega ganho de acurácia.
-
-## Testes e validação
-
-- Sintaxe rápida: `python -m py_compile app.py pages/1_Formulario_e_Predicao.py pages/2_Sugestao_de_Candidatos.py`
-- Adicione testes unitários em `tests/` conforme novas funcionalidades forem criadas.
-
-## Dados
-
-- Os arquivos completos em `datasets/` ultrapassam o limite de 25 MB do GitHub e devem ficar fora do controle de versão (estão ignorados pelo `.gitignore`).
-- O diretório `datasets/samples/` armazena subconjuntos leves gerados a partir dos dados reais para desenvolvimento local e demonstrações.
-- Recrie as amostras executando `python scripts/create_sample_datasets.py` sempre que atualizar os dados brutos.
-- Para rodar o app com o volume integral, mantenha os arquivos originais na raiz de `datasets/` com os mesmos nomes utilizados internamente.
-
-## Observações
-
-- Os datasets são volumosos; execute o app localmente utilizando o cache do Streamlit (`@st.cache_data`) já configurado.
-- Para atualizar vagas ou artefatos em produção (Streamlit Cloud), mantenha o layout de diretórios descrito acima.
+- Dúvidas sobre o uso do aplicativo podem ser registradas via issues no GitHub.  
+- Ajustes no modelo ou pipelines devem seguir os scripts em `src/` e `scripts/`, como documentado internamente para a equipe técnica.
