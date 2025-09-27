@@ -118,20 +118,27 @@ def parse_req_sap(req_text, vaga_sap_field=None):
     return int(("sap" in s) or ("4hana" in s) or ("s/4hana" in s) or ("s4hana" in s))
 
 # -----------------------------------
-# Carregamento simples de "vagas.json"
+# Carregamento simples de "vagas.json" via Google Drive
 # -----------------------------------
+ID_VAGAS_JSON = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"  # ID do Google Drive
+
 @st.cache_data
 def load_jobs(base_dir="datasets", uploaded_file=None):
     import json, os
-    # preferir upload se o usurio enviou
+    path = os.path.join(base_dir,"vagas.json")
+    
+    # Baixar do Google Drive se não existir
+    if not os.path.exists(path):
+        download_if_missing(ID_VAGAS_JSON, Path(path))
+
+    # Preferir upload se o usuário enviou
     if uploaded_file is not None:
         vagas = json.load(uploaded_file)
     else:
-        path = os.path.join(base_dir,"vagas.json")
         if not os.path.exists(path):
-            # Retorna vazio (nada de st.stop)
             return pd.DataFrame(), {"error": f"Arquivo no encontrado: {path}"}
-        vagas = json.load(open(path, "r", encoding="utf-8"))
+        with open(path, "r", encoding="utf-8") as f:
+            vagas = json.load(f)
 
     rows = []
     for jid, j in vagas.items():
@@ -153,25 +160,28 @@ def load_jobs(base_dir="datasets", uploaded_file=None):
             "vaga_sap_raw": ib.get("vaga_sap","")
         })
     df = pd.DataFrame(rows)
-    # requisitos derivados do texto
+
+    # Requisitos derivados do texto
     df["req_ing_ord"]  = df["req_text_clean"].apply(lambda t: parse_req_lang(t,"ingles")).astype(int)
     df["req_esp_ord"]  = df["req_text_clean"].apply(lambda t: parse_req_lang(t,"espanhol")).astype(int)
     df["req_acad_ord"] = df["req_text_clean"].apply(parse_req_acad).astype(int)
     df["job_pcd_req"]  = df["req_text_clean"].apply(parse_req_pcd).astype(int)
     df["job_sap_req"]  = df.apply(lambda r: parse_req_sap(r["req_text_clean"], r["vaga_sap_raw"]), axis=1).astype(int)
+    
     return df, {}
-
 # -------------------
-# Sidebar: seleo
+# Sidebar: seleção
 # -------------------
-base_dir_default = str(ROOT_DIR / "datasets")
+base_dir_default = Path(ROOT_DIR / "datasets")
+base_dir_default.mkdir(exist_ok=True)  # garante que a pasta exista
 
 def render_app(section: str | None = None) -> None:
     st.title("Triagem e Recomendações de Talentos")
 
-    df_jobs, err = load_jobs(base_dir_default)
+    # Carregar vagas (irá baixar do Drive se necessário)
+    df_jobs, err = load_jobs(base_dir=str(base_dir_default))
     if err:
-        st.error(err["error"])
+        st.error(err.get("error", "Erro desconhecido ao carregar vagas."))
         st.stop()
 
     if df_jobs.empty:
@@ -183,8 +193,8 @@ def render_app(section: str | None = None) -> None:
 
     def job_label(job_id: str) -> str:
         row = jobs_indexed.loc[job_id]
-        titulo = str(row.get("titulo", "") or "").strip()
-        cliente = str(row.get("cliente", "") or "").strip()
+        titulo = str(row.get("titulo", "")).strip()
+        cliente = str(row.get("cliente", "")).strip()
         parts = [str(job_id)]
         if titulo:
             parts.append(titulo)
@@ -1052,6 +1062,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
