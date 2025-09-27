@@ -7,25 +7,67 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+import pandas as pd
+from pathlib import Path
+import streamlit as st
+from ast import literal_eval
+import altair as alt
+
 st.set_page_config(page_title="Home - Dashboard", page_icon=":bar_chart:", layout="wide")
 st.title(":bar_chart: Visão Geral do Banco de Talentos")
 
-# Links diretos do Google Drive
-URL_APPLICANTS = "https://drive.google.com/uc?id=1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
-URL_JOBS = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
-URL_PROSPECTS = "https://drive.google.com/uc?id=1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
+# ---------------------------
+# IDs dos arquivos no Google Drive
+# ---------------------------
+ID_APPLICANTS = "1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
+ID_JOBS = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
+ID_PROSPECTS = "1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
 
+DATASETS_DIR = Path("datasets")
+DATASETS_DIR.mkdir(exist_ok=True)
+
+# ---------------------------
+# Função auxiliar de download
+# ---------------------------
+import gdown
+def download_if_missing(file_id: str, path: Path):
+    if not path.exists():
+        url = f"https://drive.google.com/uc?id={file_id}"
+        print(f"Baixando {path.name} do Google Drive...")
+        gdown.download(url, str(path), quiet=False, fuzzy=True)
+    else:
+        print(f"Arquivo {path.name} já existe localmente.")
+
+# ---------------------------
+# Função para carregar datasets
+# ---------------------------
 @st.cache_data(show_spinner=False)
-def load_datasets(from_drive: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        apps = pd.read_csv(URL_APPLICANTS)
-        jobs = pd.read_csv(URL_JOBS)
-        prospects = pd.read_csv(URL_PROSPECTS)
-        return apps, jobs, prospects
+def load_datasets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    path_apps = DATASETS_DIR / "df_applicants.csv"
+    path_jobs = DATASETS_DIR / "df_jobs.csv"
+    path_prospects = DATASETS_DIR / "df_prospects.csv"
 
+    # Baixar arquivos se não existirem
+    download_if_missing(ID_APPLICANTS, path_apps)
+    download_if_missing(ID_JOBS, path_jobs)
+    download_if_missing(ID_PROSPECTS, path_prospects)
+
+    # Ler os CSVs
+    apps = pd.read_csv(path_apps)
+    jobs = pd.read_csv(path_jobs)
+    prospects = pd.read_csv(path_prospects)
+    
+    return apps, jobs, prospects
+
+# ---------------------------
 # Carregar datasets
+# ---------------------------
 apps, jobs, prospects = load_datasets()
 st.success("✅ Dados carregados com sucesso do Google Drive!")
 
+# ---------------------------
+# KPIs principais
+# ---------------------------
 st.caption(
     "Os dados abaixo utilizam `df_applicants.csv`, `df_jobs.csv` e `df_prospects.csv` no diretório informado."
 )
@@ -39,6 +81,9 @@ col4.metric("Candidatos PCD (%)", f"{perc_pcd:0.1f}%")
 
 st.divider()
 
+# ---------------------------
+# Gráficos
+# ---------------------------
 apps_levels = apps['nivel_academico'].fillna('Não informado').astype(str).str.title()
 levels_df = apps_levels.value_counts().reset_index()
 levels_df.columns = ['Formação', 'Quantidade']
@@ -70,6 +115,9 @@ c3.altair_chart(status_chart, use_container_width=True)
 
 st.divider()
 
+# ---------------------------
+# Skills
+# ---------------------------
 apps['skills_list'] = apps['skills_list'].fillna('[]').apply(
     lambda x: literal_eval(x) if isinstance(x, str) else x
 )
@@ -94,6 +142,9 @@ col_b.altair_chart(clients_chart, use_container_width=True)
 
 st.divider()
 
+# ---------------------------
+# Distribuição de idiomas
+# ---------------------------
 apps['nivel_ingles'] = apps['nivel_ingles'].fillna('Não informado').astype(str).str.title()
 apps['nivel_espanhol'] = apps['nivel_espanhol'].fillna('Não informado').astype(str).str.title()
 ing_table = apps['nivel_ingles'].value_counts().rename_axis('Nível').reset_index(name='Candidatos')
@@ -109,6 +160,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
