@@ -2,7 +2,7 @@
 
 from ast import literal_eval
 from pathlib import Path
-
+import gdown
 import altair as alt
 import pandas as pd
 import streamlit as st
@@ -109,6 +109,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
