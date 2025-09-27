@@ -7,7 +7,7 @@ import unicodedata
 from html import escape
 from ast import literal_eval
 from pathlib import Path
-
+import gdown
 from src.mlp_infer import NUM_COLS, cosine_01
 from train_mlp import pick_cv_text, pick_req_text
 
@@ -1062,6 +1062,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
