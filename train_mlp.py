@@ -8,7 +8,7 @@ import re
 import unicodedata
 from ast import literal_eval
 from pathlib import Path
-
+import gdown
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import TruncatedSVD
@@ -20,10 +20,20 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 
-URL_APPLICANTS = "https://drive.google.com/uc?id=1Nr1iMwYy-tFqzWpvd2PJuDnYLY1Kv459"
-URL_JOBS = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
-URL_PROSPECTS = "https://drive.google.com/uc?id=1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
+# ---------------------------
+# IDs dos arquivos no Google Drive
+# ---------------------------
+ID_APPLICANTS = "1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
+ID_JOBS = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
+ID_PROSPECTS = "1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
 
+def download_if_missing(file_id: str, path: Path):
+    if not path.exists():
+        url = f"https://drive.google.com/uc?id={file_id}"
+        print(f"Baixando {path.name} do Google Drive...")
+        gdown.download(url, str(path), quiet=False, fuzzy=True)
+    else:
+        print(f"Arquivo {path.name} já existe localmente.")
 SEED = 42
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
@@ -289,9 +299,9 @@ def pick_req_text(row: pd.Series) -> str:
     return " ".join(p for p in parts if isinstance(p, str))
 
 def load_and_prepare() -> pd.DataFrame:
-    apps = pd.read_csv(URL_APPLICANTS)
-    jobs = pd.read_csv(URL_JOBS)
-    prospects = pd.read_csv(URL_PROSPECTS)
+    apps = pd.read_csv(ID_APPLICANTS)
+    jobs = pd.read_csv(ID_JOBS)
+    prospects = pd.read_csv(ID_PROSPECTS)
 
     df = prospects.merge(apps, on="candidate_id", how="left")
     df = df.merge(jobs, on="job_id", how="left", suffixes=("", "_job"))
@@ -559,4 +569,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
