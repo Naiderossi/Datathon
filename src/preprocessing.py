@@ -22,6 +22,7 @@ from .utils import (
 URL_APPLICANTS = "https://drive.google.com/uc?id=1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
 URL_JOBS = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
 URL_PROSPECTS = "https://drive.google.com/uc?id=1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
+URL_VAGAS_JSON = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
 
 DATASETS_DIR = Path('datasets')
 DATASETS_DIR.mkdir(exist_ok=True)
@@ -97,16 +98,26 @@ def load_all(extra_jobs: Optional[pd.DataFrame] = None) -> Tuple[pd.DataFrame, p
     return apps, jobs, prospect_ids
 
 
-def load_vagas_json(base_dir: Path | str = 'datasets', uploaded_file=None) -> tuple[pd.DataFrame, dict]:
+def load_vagas_json(base_dir: Path | str = 'datasets', uploaded_file=None) -> Tuple[pd.DataFrame, dict]:
     base_dir = Path(base_dir)
+    base_dir.mkdir(exist_ok=True)
+
     if uploaded_file is not None:
+        # Se o usuário fez upload do arquivo
         vagas = json.load(uploaded_file)
     else:
+        # Caminho local do JSON
         vagas_path = base_dir / 'vagas.json'
-        if not vagas_path.exists():
-            return pd.DataFrame(), {'error': f'Arquivo não encontrado: {vagas_path}'}
-        vagas = json.loads(vagas_path.read_text(encoding='utf-8'))
+        
+        # Baixa do Google Drive se não existir
+        download_if_missing(URL_VAGAS_JSON, vagas_path)
+        
+        try:
+            vagas = json.loads(vagas_path.read_text(encoding='utf-8'))
+        except Exception as e:
+            return pd.DataFrame(), {'error': f'Erro ao ler o arquivo: {e}'}
 
+    # Extrai informações e monta DataFrame
     rows = []
     for job_id, data in vagas.items():
         informacoes = data.get('informacoes_basicas', {})
@@ -126,6 +137,7 @@ def load_vagas_json(base_dir: Path | str = 'datasets', uploaded_file=None) -> tu
             'req_text_clean': req_text,
             'vaga_sap_raw': informacoes.get('vaga_sap', ''),
         })
+
     df = pd.DataFrame(rows)
     return df, {}
 
@@ -137,4 +149,5 @@ __all__ = [
     'load_all',
     'load_vagas_json',
 ]
+
 
