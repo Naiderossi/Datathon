@@ -17,12 +17,12 @@ from .utils import (
 )
 
 # ---------------------------
-# URLs dos arquivos no Google Drive
+# IDs dos arquivos no Google Drive
 # ---------------------------
-URL_APPLICANTS = "https://drive.google.com/uc?id=1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
-URL_JOBS = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
-URL_PROSPECTS = "https://drive.google.com/uc?id=1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
-URL_VAGAS_JSON = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
+ID_APPLICANTS = "1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
+ID_JOBS = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
+ID_PROSPECTS = "1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
+ID_VAGAS_JSON = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
 
 DATASETS_DIR = Path('datasets')
 DATASETS_DIR.mkdir(exist_ok=True)
@@ -32,16 +32,18 @@ DATASETS_DIR.mkdir(exist_ok=True)
 # ---------------------------
 def download_if_missing(url: str, path: Path):
     if not path.exists():
+        url = f"https://drive.google.com/uc?id={file_id}"
         print(f"Baixando {path.name} do Google Drive...")
-        gdown.download(url, str(path), quiet=False)
+        gdown.download(url, str(path), quiet=False, fuzzy=True)
     else:
         print(f"Arquivo {path.name} já existe localmente.")
+
 
 # ---------------------------
 # Carregar Applicants
 # ---------------------------
 def load_applicants(path: Path | str = DATASETS_DIR / 'df_applicants.csv') -> pd.DataFrame:
-    download_if_missing(URL_APPLICANTS, Path(path))
+    download_if_missing(ID_APPLICANTS, Path(path))
     df = pd.read_csv(path)
     df = df.drop_duplicates('candidate_id').set_index('candidate_id')
     for col in ['skills_text', 'cv_pt', 'cv_pt_clean', 'cv_pt_clean_noaccents', 'cv_en']:
@@ -56,7 +58,7 @@ def load_applicants(path: Path | str = DATASETS_DIR / 'df_applicants.csv') -> pd
 # Carregar Jobs
 # ---------------------------
 def load_jobs(path: Path | str = DATASETS_DIR / 'df_jobs.csv') -> pd.DataFrame:
-    download_if_missing(URL_JOBS, Path(path))
+    download_if_missing(ID_JOBS, Path(path))
     df = pd.read_csv(path)
     df = df.drop_duplicates('job_id').set_index('job_id')
     for col in ['req_text_clean', 'req_text_clean_noaccents', 'req_text']:
@@ -69,7 +71,7 @@ def load_jobs(path: Path | str = DATASETS_DIR / 'df_jobs.csv') -> pd.DataFrame:
 # Carregar Prospects
 # ---------------------------
 def load_prospects(path: Path | str = DATASETS_DIR / 'df_prospects.csv') -> pd.DataFrame:
-    download_if_missing(URL_PROSPECTS, Path(path))
+    download_if_missing(ID_PROSPECTS, Path(path))
     return pd.read_csv(path)
 
 # ---------------------------
@@ -149,5 +151,6 @@ __all__ = [
     'load_all',
     'load_vagas_json',
 ]
+
 
 
