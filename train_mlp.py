@@ -20,6 +20,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 
+URL_APPLICANTS = "https://drive.google.com/uc?id=1Nr1iMwYy-tFqzWpvd2PJuDnYLY1Kv459"
+URL_JOBS = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
+URL_PROSPECTS = "https://drive.google.com/uc?id=1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
+
 SEED = 42
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
@@ -285,9 +289,9 @@ def pick_req_text(row: pd.Series) -> str:
     return " ".join(p for p in parts if isinstance(p, str))
 
 def load_and_prepare() -> pd.DataFrame:
-    apps = pd.read_csv(Path("datasets") / "df_applicants.csv")
-    jobs = pd.read_csv(Path("datasets") / "df_jobs.csv")
-    prospects = pd.read_csv(Path("datasets") / "df_prospects.csv")
+    apps = pd.read_csv(URL_APPLICANTS)
+    jobs = pd.read_csv(URL_JOBS)
+    prospects = pd.read_csv(URL_PROSPECTS)
 
     df = prospects.merge(apps, on="candidate_id", how="left")
     df = df.merge(jobs, on="job_id", how="left", suffixes=("", "_job"))
@@ -555,3 +559,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
