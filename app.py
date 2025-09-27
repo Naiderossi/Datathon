@@ -19,17 +19,7 @@ ROOT_DIR = Path(__file__).resolve().parent
 DEFAULT_DATASETS_DIR = ROOT_DIR / "datasets"
 
 st.sidebar.header("Configurações")
-data_dir_input = st.sidebar.text_input(
-    "Diretório dos datasets",
-    value=str(DEFAULT_DATASETS_DIR),
-    help="Caminho para os arquivos df_applicants.csv, df_jobs.csv e df_prospects.csv."
-)
-data_dir = Path(data_dir_input).expanduser()
-
-if not data_dir.exists():
-    st.error(f"Diretório não encontrado: {data_dir}")
-    st.stop()
-
+use_drive = st.sidebar.checkbox("Carregar datasets do Google Drive", value=True)
 
 @st.cache_data(show_spinner=False)
 def load_datasets(from_drive: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -139,4 +129,5 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
