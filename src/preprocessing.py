@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Tuple
-
+from typing import Optional, Tuple,Set
+import gdown
 import json
 import pandas as pd
 
@@ -16,10 +16,31 @@ from .utils import (
     safe_list_parse,
 )
 
+# ---------------------------
+# URLs dos arquivos no Google Drive
+# ---------------------------
+URL_APPLICANTS = "https://drive.google.com/uc?id=1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
+URL_JOBS = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
+URL_PROSPECTS = "https://drive.google.com/uc?id=1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
+
 DATASETS_DIR = Path('datasets')
+DATASETS_DIR.mkdir(exist_ok=True)
 
+# ---------------------------
+# Função auxiliar para baixar arquivos se não existirem
+# ---------------------------
+def download_if_missing(url: str, path: Path):
+    if not path.exists():
+        print(f"Baixando {path.name} do Google Drive...")
+        gdown.download(url, str(path), quiet=False)
+    else:
+        print(f"Arquivo {path.name} já existe localmente.")
 
+# ---------------------------
+# Carregar Applicants
+# ---------------------------
 def load_applicants(path: Path | str = DATASETS_DIR / 'df_applicants.csv') -> pd.DataFrame:
+    download_if_missing(URL_APPLICANTS, Path(path))
     df = pd.read_csv(path)
     df = df.drop_duplicates('candidate_id').set_index('candidate_id')
     for col in ['skills_text', 'cv_pt', 'cv_pt_clean', 'cv_pt_clean_noaccents', 'cv_en']:
@@ -30,7 +51,11 @@ def load_applicants(path: Path | str = DATASETS_DIR / 'df_applicants.csv') -> pd
     return df
 
 
+# ---------------------------
+# Carregar Jobs
+# ---------------------------
 def load_jobs(path: Path | str = DATASETS_DIR / 'df_jobs.csv') -> pd.DataFrame:
+    download_if_missing(URL_JOBS, Path(path))
     df = pd.read_csv(path)
     df = df.drop_duplicates('job_id').set_index('job_id')
     for col in ['req_text_clean', 'req_text_clean_noaccents', 'req_text']:
@@ -39,16 +64,22 @@ def load_jobs(path: Path | str = DATASETS_DIR / 'df_jobs.csv') -> pd.DataFrame:
     df['req_len_tokens'] = df.get('req_len_tokens', 0).fillna(0)
     return df
 
-
+# ---------------------------
+# Carregar Prospects
+# ---------------------------
 def load_prospects(path: Path | str = DATASETS_DIR / 'df_prospects.csv') -> pd.DataFrame:
+    download_if_missing(URL_PROSPECTS, Path(path))
     return pd.read_csv(path)
 
-
-def load_all(extra_jobs: Optional[pd.DataFrame] = None) -> Tuple[pd.DataFrame, pd.DataFrame, set[int]]:
+# ---------------------------
+# Carregar todos
+# ---------------------------
+def load_all(extra_jobs: Optional[pd.DataFrame] = None) -> Tuple[pd.DataFrame, pd.DataFrame, Set[int]]:
     apps = load_applicants()
     jobs = load_jobs()
     prospects = load_prospects()
     prospect_ids = set(prospects['candidate_id'])
+    return apps, jobs, prospect_ids
 
     if extra_jobs is not None and not extra_jobs.empty:
         extra_jobs = extra_jobs.copy()
@@ -106,3 +137,4 @@ __all__ = [
     'load_all',
     'load_vagas_json',
 ]
+
