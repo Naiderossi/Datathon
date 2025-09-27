@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+.env/
+
+# Streamlit and tooling caches
+.streamlit/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Local datasets above the GitHub size limit
+datasets/*.csv
+datasets/*.json
+datasets/*.parquet
+datasets/*.feather
+datasets/*.xlsx
+datasets/*.zip
+!datasets/samples/
+!datasets/samples/**
+
+# Temporary files
+*.log
+*.tmp
