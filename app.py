@@ -11,7 +11,7 @@ st.set_page_config(page_title="Home - Dashboard", page_icon=":bar_chart:", layou
 st.title(":bar_chart: Visão Geral do Banco de Talentos")
 
 # Links diretos do Google Drive
-URL_APPLICANTS = "https://drive.google.com/uc?id=1Nr1iMwYy-tFqzWpvd2PJuDnYLY1Kv459"
+URL_APPLICANTS = "https://drive.google.com/uc?id=1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
 URL_JOBS = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
 URL_PROSPECTS = "https://drive.google.com/uc?id=1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
 
@@ -109,6 +109,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
