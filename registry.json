@@ -1,0 +1,10 @@
+{
+  "model_type": "mlp_lsa",
+  "pipeline": "models\\data_pipeline.joblib",
+  "model": "models\\model_mlp_lsa.h5",
+  "thresholds": "models\\thresholds.json",
+  "metrics": {
+    "best_f1": 0.7141645413652115,
+    "f1_at_0.50": 0.6566820276497696
+  }
+}
