@@ -1,4 +1,4 @@
-﻿# app.py  FormulÃ¡rio padrÃ£o + mapeamento de features para o modelo
+﻿# app.py  Formulario padrão + mapeamento de features para o modelo
 import json
 import os
 import re
@@ -8,7 +8,7 @@ from html import escape
 from ast import literal_eval
 from pathlib import Path
 
-from mlp_infer import NUM_COLS, cosine_01
+from src.mlp_infer import NUM_COLS, cosine_01
 from train_mlp import pick_cv_text, pick_req_text
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -1055,6 +1055,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
