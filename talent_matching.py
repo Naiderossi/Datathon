@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 
 def resolve_artifact(rel_path: str) -> str | None:
-    """Procura o arquivo em vÃ¡rios lugares plausÃ­veis e retorna o caminho absoluto."""
+    """Procura o arquivo em vários lugares plausíveis e retorna o caminho absoluto."""
     here = Path(__file__).resolve()
     roots = [Path.cwd()] + [parent for parent in here.parents]
     for root in roots:
@@ -29,15 +29,12 @@ def resolve_artifact(rel_path: str) -> str | None:
             return str(p)
     return None
 
-
-# === (Opcional) se voc j criou o helper, habilita predio direto:
 HAS_MLP = False
 try:
-    from mlp_infer import MLPArtifact
+    from src.mlp_infer import MLPArtifact
     HAS_MLP = True
 except Exception:
     pass
-
 
 # -----------------------
 # Utilitrios de parsing
@@ -1055,6 +1052,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
