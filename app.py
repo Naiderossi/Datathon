@@ -15,36 +15,16 @@ URL_APPLICANTS = "https://drive.google.com/uc?id=1Nr1iMwYy-tFqzWpvd2PJuDnYLY1Kv4
 URL_JOBS = "https://drive.google.com/uc?id=1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
 URL_PROSPECTS = "https://drive.google.com/uc?id=1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
 
-ROOT_DIR = Path(__file__).resolve().parent
-DEFAULT_DATASETS_DIR = ROOT_DIR / "datasets"
-
-st.sidebar.header("Configurações")
-use_drive = st.sidebar.checkbox("Carregar datasets do Google Drive", value=True)
-
 @st.cache_data(show_spinner=False)
 def load_datasets(from_drive: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    if from_drive:
         apps = pd.read_csv(URL_APPLICANTS)
         jobs = pd.read_csv(URL_JOBS)
         prospects = pd.read_csv(URL_PROSPECTS)
-    else:
-        ROOT_DIR = Path(__file__).resolve().parent
-        DEFAULT_DATASETS_DIR = ROOT_DIR / "datasets"
-        apps = pd.read_csv(DEFAULT_DATASETS_DIR / "df_applicants.csv")
-        jobs = pd.read_csv(DEFAULT_DATASETS_DIR / "df_jobs.csv")
-        prospects = pd.read_csv(DEFAULT_DATASETS_DIR / "df_prospects.csv")
-    return apps, jobs, prospects
+        return apps, jobs, prospects
 
 # Carregar datasets
-apps, jobs, prospects = load_datasets(from_drive=use_drive)
-st.success("✅ Dados carregados com sucesso do Google Drive!" if use_drive else "✅ Dados carregados do diretório local")
-
-
-##try:
-##    apps, jobs, prospects = load_datasets(str(data_dir))
-##except FileNotFoundError as exc:
-##    st.error(f"Arquivo não encontrado: {exc}")
-##    st.stop()
+apps, jobs, prospects = load_datasets()
+st.success("✅ Dados carregados com sucesso do Google Drive!")
 
 st.caption(
     "Os dados abaixo utilizam `df_applicants.csv`, `df_jobs.csv` e `df_prospects.csv` no diretório informado."
@@ -129,5 +109,6 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
