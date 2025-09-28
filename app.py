@@ -24,40 +24,45 @@ api.dataset_download_files(
     unzip=True
 )
 
-
+# ---------------------------
+# Configuração inicial
+# ---------------------------
 st.set_page_config(page_title="Home - Dashboard", page_icon=":bar_chart:", layout="wide")
 st.title(":bar_chart: Visão Geral do Banco de Talentos")
 
 # ---------------------------
-# Caminho para os arquivos locais .parquet
+# Baixar dataset privado
 # ---------------------------
-DATASETS_DIR = Path("datasets")
-PATH_APPLICANTS = DATASETS_DIR / "df_applicants.parquet"
-PATH_JOBS = DATASETS_DIR / "df_jobs.parquet"
-PATH_PROSPECTS = DATASETS_DIR / "df_prospects.parquet"
+DATASETS_DIR = Path("data")
+DATASETS_DIR.mkdir(exist_ok=True)
+
+# ---------------------------
+# Arquivos CSV baixados
+# ---------------------------
+PATH_APPLICANTS = DATASETS_DIR / "df_applicants.csv"
+PATH_JOBS = DATASETS_DIR / "df_jobs.csv"
+PATH_PROSPECTS = DATASETS_DIR / "df_prospects.csv"
 
 # ---------------------------
 # Função para carregar datasets
 # ---------------------------
 @st.cache_data(show_spinner=False)
 def load_datasets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    apps = pd.read_parquet(PATH_APPLICANTS)
-    jobs = pd.read_parquet(PATH_JOBS)
-    prospects = pd.read_parquet(PATH_PROSPECTS)
+    apps = pd.read_csv(PATH_APPLICANTS)
+    jobs = pd.read_csv(PATH_JOBS)
+    prospects = pd.read_csv(PATH_PROSPECTS)
     return apps, jobs, prospects
 
 # ---------------------------
 # Carregar datasets
 # ---------------------------
 apps, jobs, prospects = load_datasets()
-st.success("✅ Dados carregados com sucesso dos arquivos locais!")
+st.success("✅ Dados carregados com sucesso dos arquivos CSV!")
 
 # ---------------------------
 # KPIs principais
 # ---------------------------
-st.caption(
-    "Os dados abaixo utilizam os arquivos `.parquet` no diretório `datasets/`."
-)
+st.caption("Os dados abaixo utilizam os arquivos `.csv` no diretório `data/`.")
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Candidatos únicos", f"{apps['candidate_id'].nunique():,}".replace(",", "."))
@@ -145,7 +150,7 @@ col_esp.dataframe(esp_table, hide_index=True, use_container_width=True)
 
 st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
-    'Atualize os arquivos `.parquet` em `datasets/` e recarregue a página para refletir os dados mais recentes.'
+    'Atualize os arquivos `.csv` em `data/` e recarregue a página para refletir os dados mais recentes.'
 )
 
 
