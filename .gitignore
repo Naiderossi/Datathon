@@ -18,7 +18,6 @@ __pycache__/
 # Local datasets above the GitHub size limit
 datasets/*.csv
 datasets/*.json
-datasets/*.parquet
 datasets/*.feather
 datasets/*.xlsx
 datasets/*.zip
@@ -28,3 +27,4 @@ datasets/*.zip
 # Temporary files
 *.log
 *.tmp
+
