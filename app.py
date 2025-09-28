@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from ast import literal_eval
 from pathlib import Path
@@ -6,12 +6,6 @@ import gdown
 import altair as alt
 import pandas as pd
 import streamlit as st
-
-import pandas as pd
-from pathlib import Path
-import streamlit as st
-from ast import literal_eval
-import altair as alt
 
 st.set_page_config(page_title="Home - Dashboard", page_icon=":bar_chart:", layout="wide")
 st.title(":bar_chart: Visão Geral do Banco de Talentos")
@@ -29,12 +23,11 @@ DATASETS_DIR.mkdir(exist_ok=True)
 # ---------------------------
 # Função auxiliar de download
 # ---------------------------
-import gdown
 def download_if_missing(file_id: str, path: Path):
     if not path.exists():
         url = f"https://drive.google.com/uc?id={file_id}"
         print(f"Baixando {path.name} do Google Drive...")
-        gdown.download(url, str(path), quiet=False, fuzzy=True)
+       gdown.download(url, str(path), quiet=False, fuzzy=False)
     else:
         print(f"Arquivo {path.name} já existe localmente.")
 
@@ -160,7 +153,6 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
-
 
 
 
