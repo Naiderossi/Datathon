@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Optional, Tuple, Set
 import json
 import pandas as pd
-
+import streamlit as st
+import os
 from .utils import (
     map_level,
     parse_req_acad,
@@ -150,6 +151,7 @@ __all__ = [
     "load_all",
     "load_vagas_json",
 ]
+
 
 
 
