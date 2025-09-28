@@ -19,11 +19,10 @@ from .utils import (
 # ---------------------------
 # IDs dos arquivos no Google Drive
 # ---------------------------
-ID_APPLICANTS = "1Nr1iMwYy-tFqzWpvd2PJuDnYLY1Kv459"
-ID_JOBS = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
-ID_PROSPECTS = "1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
-ID_VAGAS_JSON = "1TM2UG3esDuhWhpWYpfaOAy6V74Utucf3"
-
+ID_APPLICANTS = "18QTiuVFUz3i1xO9bXk9GDZeE6uoX__fb"
+ID_JOBS = "1dKkSt5PL-tvCyZOqJvDjTDScFVQgms4c"
+ID_PROSPECTS = "1uU3N7XANV_jvHAaWIRFOrqlhkXd-jmRz"
+ID_VAGAS_JSON = "1spB6LjvkGBOXQQOOmllV4S5zC1CfWnIw" 
 # ---------------------------
 # Função auxiliar para baixar arquivos do Google Drive
 # ---------------------------
@@ -40,8 +39,8 @@ def download_from_drive(file_id: str, filename: str) -> Path:
 # Carregar Applicants
 # ---------------------------
 def load_applicants() -> pd.DataFrame:
-    path = download_from_drive(ID_APPLICANTS, "df_applicants.csv")
-    df = pd.read_csv(path)
+    path = download_from_drive(ID_APPLICANTS, "df_applicants.parquet")
+    df = pd.read_parquet(path)
     df = df.drop_duplicates("candidate_id").set_index("candidate_id")
     for col in ["skills_text", "cv_pt", "cv_pt_clean", "cv_pt_clean_noaccents", "cv_en"]:
         if col in df.columns:
@@ -55,8 +54,8 @@ def load_applicants() -> pd.DataFrame:
 # Carregar Jobs
 # ---------------------------
 def load_jobs() -> pd.DataFrame:
-    path = download_from_drive(ID_JOBS, "df_jobs.csv")
-    df = pd.read_csv(path)
+    path = download_from_drive(ID_JOBS, "df_jobs.parquet")
+    df = pd.read_parquet(path)
     df = df.drop_duplicates("job_id").set_index("job_id")
     for col in ["req_text_clean", "req_text_clean_noaccents", "req_text"]:
         if col in df.columns:
@@ -69,8 +68,8 @@ def load_jobs() -> pd.DataFrame:
 # Carregar Prospects
 # ---------------------------
 def load_prospects() -> pd.DataFrame:
-    path = download_from_drive(ID_PROSPECTS, "df_prospects.csv")
-    return pd.read_csv(path)
+    path = download_from_drive(ID_PROSPECTS, "df_prospects.parquet")
+    return pd.read_parquet(path)
 
 
 # ---------------------------
@@ -142,6 +141,7 @@ __all__ = [
     "load_all",
     "load_vagas_json",
 ]
+
 
 
 
