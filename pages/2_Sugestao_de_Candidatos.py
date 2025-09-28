@@ -10,7 +10,8 @@ if str(ROOT_DIR) not in sys.path:
 from talent_matching import render_app
 
 st.set_page_config(page_title="Sugestão de Candidatos", page_icon=":busts_in_silhouette:")
-render_app(section="sourcing")
+talent_matching.render_app(section="sourcing")
+
 
 
 
