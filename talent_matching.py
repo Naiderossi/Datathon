@@ -896,8 +896,7 @@ def tab2_get_artifact():
 
 @st.cache_data(show_spinner=False)
 def tab2_load_base_data():
-    apps = pd.read_csv(
-        'datasets/df_applicants.csv',
+    apps = load_applicants().reset_index(),
         usecols=[
             'candidate_id', 'nome', 'email', 'telefone', 'pcd',
             'nivel_ingles', 'nivel_espanhol', 'nivel_academico',
@@ -905,14 +904,13 @@ def tab2_load_base_data():
             'cv_pt', 'cv_pt_clean', 'cv_pt_clean_noaccents', 'cv_en', 'cv_len_tokens'
         ]
     )
-    jobs = pd.read_csv(
-        'datasets/df_jobs.csv',
+    jobs = load_jobs().reset_index(),
         usecols=[
             'job_id', 'titulo_vaga', 'cliente', 'nivel_ingles_req', 'nivel_espanhol_req',
             'vaga_sap', 'req_text_clean', 'req_text_clean_noaccents', 'req_text', 'req_len_tokens'
         ]
     )
-    prospects = pd.read_csv('datasets/df_prospects.csv', usecols=['candidate_id'])
+    p prospects = load_prospects()[["candidate_id"]]
 
     apps = apps.drop_duplicates('candidate_id').set_index('candidate_id')
     for col in ['skills_text', 'cv_pt', 'cv_pt_clean', 'cv_pt_clean_noaccents', 'cv_en']:
@@ -1073,6 +1071,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
