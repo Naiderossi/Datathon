@@ -16,31 +16,19 @@ from .utils import (
     safe_list_parse,
 )
 
-# ---------------------------
-# IDs dos arquivos no Google Drive
-# ---------------------------
-ID_APPLICANTS = "18QTiuVFUz3i1xO9bXk9GDZeE6uoX__fb"
-ID_JOBS = "1dKkSt5PL-tvCyZOqJvDjTDScFVQgms4c"
-ID_PROSPECTS = "1uU3N7XANV_jvHAaWIRFOrqlhkXd-jmRz"
-ID_VAGAS_JSON = "1spB6LjvkGBOXQQOOmllV4S5zC1CfWnIw" 
-# ---------------------------
-# Função auxiliar para baixar arquivos do Google Drive
-# ---------------------------
-def download_from_drive(file_id: str, filename: str) -> Path:
-    path = Path("/tmp") / filename
-    if not path.exists():
-        url = f"https://drive.google.com/uc?id={file_id}"
-        print(f"Baixando {filename} do Google Drive...")
-        gdown.download(url, str(path), quiet=False, fuzzy=True)
-    return path
 
+# Caminhos para arquivos locais
+FILE_APPLICANTS = Path("datasets/df_applicants.parquet")
+FILE_JOBS = Path("datasets/df_jobs.parquet")
+FILE_PROSPECTS = Path("datasets/df_prospects.parquet")
 
 # ---------------------------
 # Carregar Applicants
 # ---------------------------
 def load_applicants() -> pd.DataFrame:
-    path = download_from_drive(ID_APPLICANTS, "df_applicants.parquet")
-    df = pd.read_parquet(path)
+    if not FILE_APPLICANTS.exists():
+        raise FileNotFoundError(f"Arquivo não encontrado: {FILE_APPLICANTS}")
+    df = pd.read_parquet(FILE_APPLICANTS)
     df = df.drop_duplicates("candidate_id").set_index("candidate_id")
     for col in ["skills_text", "cv_pt", "cv_pt_clean", "cv_pt_clean_noaccents", "cv_en"]:
         if col in df.columns:
@@ -54,8 +42,9 @@ def load_applicants() -> pd.DataFrame:
 # Carregar Jobs
 # ---------------------------
 def load_jobs() -> pd.DataFrame:
-    path = download_from_drive(ID_JOBS, "df_jobs.parquet")
-    df = pd.read_parquet(path)
+    if not FILE_JOBS.exists():
+        raise FileNotFoundError(f"Arquivo não encontrado: {FILE_JOBS}")
+    df = pd.read_parquet(FILE_JOBS)
     df = df.drop_duplicates("job_id").set_index("job_id")
     for col in ["req_text_clean", "req_text_clean_noaccents", "req_text"]:
         if col in df.columns:
@@ -68,9 +57,9 @@ def load_jobs() -> pd.DataFrame:
 # Carregar Prospects
 # ---------------------------
 def load_prospects() -> pd.DataFrame:
-    path = download_from_drive(ID_PROSPECTS, "df_prospects.parquet")
-    return pd.read_parquet(path)
-
+    if not FILE_PROSPECTS.exists():
+        raise FileNotFoundError(f"Arquivo não encontrado: {FILE_PROSPECTS}")
+    return pd.read_parquet(FILE_PROSPECTS)
 
 # ---------------------------
 # Carregar todos
@@ -96,44 +85,32 @@ def load_all(extra_jobs: Optional[pd.DataFrame] = None) -> Tuple[pd.DataFrame, p
 
     return apps, jobs, prospect_ids
 
-
 # ---------------------------
-# Carregar Vagas JSON
+# Carregar Vagas Parquet
 # ---------------------------
-def load_vagas_json(uploaded_file=None) -> Tuple[pd.DataFrame, dict]:
-    if uploaded_file is not None:
-        vagas = json.load(uploaded_file)
-    else:
-        path = download_from_drive(ID_VAGAS_JSON, "vagas.json")
-        try:
-            vagas = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as e:
-            return pd.DataFrame(), {"error": f"Erro ao ler o arquivo: {e}"}
+FILE_VAGAS = Path("datasets/df_vagas.parquet")
 
-    rows = []
-    for job_id, data in vagas.items():
-        informacoes = data.get("informacoes_basicas", {})
-        perfil = data.get("perfil_vaga", {})
-        req_text = " ".join([
-            str(informacoes.get("titulo_vaga", "")),
-            str(informacoes.get("descricao_vaga", "")),
-            str(perfil.get("principais_atividades", "")),
-            str(perfil.get("competencia_tecnicas_e_comportamentais", "")),
-            str(perfil.get("conhecimentos_tecnicos", "")),
-            str(perfil.get("requisitos_desejaveis", ""))
-        ]).strip()
-        rows.append({
-            "job_id": str(job_id),
-            "titulo": informacoes.get("titulo_vaga", ""),
-            "cliente": informacoes.get("cliente", ""),
-            "req_text_clean": req_text,
-            "vaga_sap_raw": informacoes.get("vaga_sap", ""),
-        })
+def load_vagas_parquet() -> pd.DataFrame:
+    if not FILE_VAGAS.exists():
+        raise FileNotFoundError(f"Arquivo não encontrado: {FILE_VAGAS}")
+    
+    df = pd.read_parquet(FILE_VAGAS)
+    
+    # Garantir colunas obrigatórias
+    for col in ["titulo", "cliente", "req_text_clean", "vaga_sap_raw"]:
+        if col not in df.columns:
+            df[col] = ""
+    
+    # Preencher valores nulos
+    df = df.fillna({
+        "titulo": "",
+        "cliente": "",
+        "req_text_clean": "",
+        "vaga_sap_raw": ""
+    })
 
-    df = pd.DataFrame(rows)
-    return df, {}
-
-
+    return df
+    
 __all__ = [
     "load_applicants",
     "load_jobs",
@@ -141,6 +118,7 @@ __all__ = [
     "load_all",
     "load_vagas_json",
 ]
+
 
 
 
