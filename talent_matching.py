@@ -125,7 +125,7 @@ def parse_req_sap(req_text, vaga_sap_field=None):
 # ----------------------------
 # Configuração Google Drive
 # ----------------------------
-ID_VAGAS_JSON = "1TM2UG3esDuhWhpWYpfaOAy6V74Utucf3"  # ID do arquivo vagas.json
+ID_VAGAS_JSON = "1spB6LjvkGBOXQQOOmllV4S5zC1CfWnIw"  # ID do arquivo vagas.json
 
 # ----------------------------
 # Função para carregar vagas
@@ -1085,6 +1085,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
