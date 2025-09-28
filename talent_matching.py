@@ -11,6 +11,9 @@ import gdown
 import io
 from src.mlp_infer import NUM_COLS, cosine_01
 from train_mlp import pick_cv_text, pick_req_text
+from src.utils import safe_list_parse
+from src.preprocessing import load_applicants, load_jobs
+
 
 ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
@@ -1071,6 +1074,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
