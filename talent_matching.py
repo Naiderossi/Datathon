@@ -216,7 +216,7 @@ def load_jobs(base_dir=None, uploaded_file=None):
 # ----------------------------
 def render_app(section: str | None = None) -> None:
     st.title("Triagem e Recomendações de Talentos")
-
+    
     # Carregar vagas diretamente do Google Drive
     df_jobs, err = load_jobs(base_dir=None)
     if err:
@@ -230,7 +230,7 @@ def render_app(section: str | None = None) -> None:
     jobs_indexed = df_jobs.set_index("job_id")
     job_options = jobs_indexed.index.tolist()
 
-    def job_label(job_id: str) -> str:
+def job_label(job_id: str) -> str:
         row = jobs_indexed.loc[job_id]
         titulo = str(row.get("titulo", "")).strip()
         cliente = str(row.get("cliente", "")).strip()
@@ -389,10 +389,10 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
         "Doutorado",
     ]
 
-    def level_label(idx: int, catalog: list[str]) -> str:
+def level_label(idx: int, catalog: list[str]) -> str:
         return catalog[idx] if 0 <= idx < len(catalog) else str(idx)
 
-    def segmented_or_radio(label, options, index=0):
+def segmented_or_radio(label, options, index=0):
         if hasattr(st, "segmented_control"):
             try:
                 return st.segmented_control(label=label, options=options, default=options[index])
@@ -622,7 +622,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
 
     cards_html: list[str] = []
 
-    def add_card(title: str, current: str, requirement: str, status: str, ok: bool) -> None:
+def add_card(title: str, current: str, requirement: str, status: str, ok: bool) -> None:
         cls = 'ok' if ok else 'warn'
         icon = '✅' if ok else '⚠️'
         cards_html.append(
@@ -634,7 +634,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
             "</div>"
         )
 
-    def format_level_status(actual_ord: int, req_ord: int) -> tuple[bool, str]:
+def format_level_status(actual_ord: int, req_ord: int) -> tuple[bool, str]:
         diff = actual_ord - req_ord
         if diff > 0:
             label = 'nível' if diff == 1 else 'níveis'
@@ -916,21 +916,36 @@ def forward_batch_tab2(weights, X):
     z2 = bn1 @ weights.w_out + weights.b_out
     return 1.0 / (1.0 + np.exp(-np.clip(z2, -60.0, 60.0)))
 
+# Configurar credenciais a partir dos secrets do Streamlit
+ os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
+ os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
+
+from kaggle.api.kaggle_api_extended import KaggleApi
 
 @st.cache_resource(show_spinner=False)
 def tab2_get_artifact():
-    pipeline_path = "models/data_pipeline.joblib"
-    model_path = "models/model_mlp_lsa.h5"
+    p# Diretório local para armazenar modelos
+    models_dir = Path("models")
+    models_dir.mkdir(exist_ok=True)
 
-    PIPELINE_URL = "https://drive.google.com/uc?id=1Yk8k8_CJGc9ND3KKwSnEQLQ5BwY8TfYB"
-    os.makedirs("models", exist_ok=True)
+    # Caminhos dos arquivos
+    pipeline_path = models_dir / "data_pipeline.joblib"
+    model_path = models_dir / "model_mlp_lsa.h5"
 
-    # Baixa o pipeline se não existir
-    if not os.path.exists(pipeline_path):
-        with st.spinner("⬇️ Baixando pipeline do Google Drive..."):
-            gdown.download(PIPELINE_URL, pipeline_path, quiet=False)
+    # Se não existir, baixa do Kaggle
+    if not pipeline_path.exists() or not model_path.exists():
+        with st.spinner("⬇️ Baixando pipeline e modelo do Kaggle..."):
+            api = KaggleApi()
+            api.authenticate()
 
-    return MLPArtifact(pipeline_path, model_path)
+            # Download do dataset privado (descompacta arquivos na pasta models/)
+            api.dataset_download_files(
+                "naiaraderossi/DatathonDataset",  # substitua pelo seu dataset
+                path=str(models_dir),
+                unzip=True
+            )
+
+return MLPArtifact(str(pipeline_path), str(model_path))
 
 @st.cache_data(show_spinner=False)
 def tab2_load_base_data():
@@ -1094,9 +1109,9 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
     result['prob_percent'] = (result['probability'] * 100).round(2)
     return result
 
-
 if __name__ == '__main__':
-    render_app()
+    	render_app()
+
 
 
 
