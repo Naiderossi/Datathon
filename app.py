@@ -7,11 +7,12 @@ import pandas as pd
 import streamlit as st
 import pyarrow.parquet as pq
 import os
-from kaggle.api.kaggle_api_extended import KaggleApi
 
 # Pegar credenciais do secrets
 os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
 os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
+
+from kaggle.api.kaggle_api_extended import KaggleApi
 
 # Autenticar
 api = KaggleApi()
@@ -152,6 +153,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os arquivos `.csv` em `data/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
