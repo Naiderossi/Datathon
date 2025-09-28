@@ -13,7 +13,7 @@ st.title(":bar_chart: Visão Geral do Banco de Talentos")
 # ---------------------------
 # IDs dos arquivos no Google Drive
 # ---------------------------
-ID_APPLICANTS = "1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
+ID_APPLICANTS = "1Nr1iMwYy-tFqzWpvd2PJuDnYLY1Kv459"
 ID_JOBS = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
 ID_PROSPECTS = "1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
 
@@ -153,6 +153,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
