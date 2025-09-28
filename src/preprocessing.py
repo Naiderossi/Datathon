@@ -19,10 +19,10 @@ from .utils import (
 # ---------------------------
 # IDs dos arquivos no Google Drive
 # ---------------------------
-ID_APPLICANTS = "1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
+ID_APPLICANTS = "1Nr1iMwYy-tFqzWpvd2PJuDnYLY1Kv459"
 ID_JOBS = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
 ID_PROSPECTS = "1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
-ID_VAGAS_JSON = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
+ID_VAGAS_JSON = "1TM2UG3esDuhWhpWYpfaOAy6V74Utucf3"
 
 DATASETS_DIR = Path('datasets')
 DATASETS_DIR.mkdir(exist_ok=True)
@@ -151,6 +151,7 @@ __all__ = [
     'load_all',
     'load_vagas_json',
 ]
+
 
 
 
