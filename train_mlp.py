@@ -22,8 +22,8 @@ import tensorflow as tf
 from kaggle.api.kaggle_api_extended import KaggleApi
 
 # Pegar credenciais do secrets
-os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["naiaraderossi"]
-os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["d28221bf240b315ab14bdb371599aeb6"]
+os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
+os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
 
 # Autenticar
 api = KaggleApi()
@@ -627,6 +627,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
