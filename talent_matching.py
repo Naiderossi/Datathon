@@ -121,10 +121,19 @@ def parse_req_sap(req_text, vaga_sap_field=None):
     s = _norm(req_text or "")
     return int(("sap" in s) or ("4hana" in s) or ("s/4hana" in s) or ("s4hana" in s))
 
+import os
+import json
+import io
+import pandas as pd
+from pathlib import Path
+import streamlit as st
+from kaggle.api.kaggle_api_extended import KaggleApi
+
 # ----------------------------
-# Configuração Google Drive
+# Configuração Kaggle
 # ----------------------------
-ID_VAGAS_JSON = "1spB6LjvkGBOXQQOOmllV4S5zC1CfWnIw"  # ID do arquivo vagas.json
+KAGGLE_DATASET = "naiaraderossi/DatathonDataset" 
+VAGAS_FILENAME = "vagas.json"
 
 # ----------------------------
 # Função para carregar vagas
@@ -132,26 +141,41 @@ ID_VAGAS_JSON = "1spB6LjvkGBOXQQOOmllV4S5zC1CfWnIw"  # ID do arquivo vagas.json
 @st.cache_data
 def load_jobs(base_dir=None, uploaded_file=None):
     """
-    Carrega vagas diretamente do Google Drive ou de upload do usuário.
-    Se base_dir=None, não utiliza pasta local.
+    Carrega vagas do Kaggle ou de upload do usuário.
+    Se base_dir=None, usa pasta local 'data/'.
     """
-    # Definir path do arquivo
+    # Definir pasta local
     if base_dir is None:
-        path = Path("vagas.json")
+        base_dir = Path("data")
     else:
-        path = Path(base_dir) / "vagas.json"
+        base_dir = Path(base_dir)
 
-    # Baixar do Google Drive se não existir
-   if not path.exists():
-    print(f"Baixando {path.name} do Google Drive...")
-    gdown.download(id=ID_VAGAS_JSON, output=str(path), quiet=False)
+    base_dir.mkdir(exist_ok=True)
+    path = base_dir / VAGAS_FILENAME
+
+    # Baixar do Kaggle se não existir
+    if not path.exists():
+        st.info(f"Arquivo {VAGAS_FILENAME} não encontrado localmente. Baixando do Kaggle...")
+        # Configurar credenciais
+        os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["naiaraderossi"]
+        os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["d28221bf240b315ab14bdb371599aeb6"]
+
+        api = KaggleApi()
+        api.authenticate()
+
+        api.dataset_download_files(
+            KAGGLE_DATASET,
+            path=base_dir,
+            unzip=True
+        )
+
+        if not path.exists():
+            return pd.DataFrame(), {"error": f"Arquivo não encontrado após download: {path}"}
 
     # Usar upload do usuário se fornecido
     if uploaded_file is not None:
         vagas = json.load(io.TextIOWrapper(uploaded_file, encoding='utf-8'))
     else:
-        if not path.exists():
-            return pd.DataFrame(), {"error": f"Arquivo não encontrado: {path}"}
         with open(path, "r", encoding="utf-8") as f:
             vagas = json.load(f)
 
@@ -185,7 +209,6 @@ def load_jobs(base_dir=None, uploaded_file=None):
     df["job_sap_req"]  = df.apply(lambda r: int(parse_req_sap(r["req_text_clean"], r["vaga_sap_raw"]) or 0), axis=1)
     
     return df, {}
-
 # ----------------------------
 # Renderização principal
 # ----------------------------
@@ -1072,6 +1095,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
