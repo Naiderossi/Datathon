@@ -139,8 +139,9 @@ def load_jobs(base_dir=None, uploaded_file=None):
         path = Path(base_dir) / "vagas.json"
 
     # Baixar do Google Drive se não existir
-    if not path.exists():
-        gdown.download(f"https://drive.google.com/uc?id={ID_VAGAS_JSON}", str(path), quiet=False)
+   if not path.exists():
+    print(f"Baixando {path.name} do Google Drive...")
+    gdown.download(id=ID_VAGAS_JSON, output=str(path), quiet=False)
 
     # Usar upload do usuário se fornecido
     if uploaded_file is not None:
@@ -1072,6 +1073,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
