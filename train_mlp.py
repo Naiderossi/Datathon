@@ -8,7 +8,7 @@ import re
 import unicodedata
 from ast import literal_eval
 from pathlib import Path
-import gdown
+
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import TruncatedSVD
@@ -20,20 +20,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 
-# ---------------------------
-# IDs dos arquivos no Google Drive
-# ---------------------------
-ID_APPLICANTS = "18QTiuVFUz3i1xO9bXk9GDZeE6uoX__fb"
-ID_JOBS = "1dKkSt5PL-tvCyZOqJvDjTDScFVQgms4c"
-ID_PROSPECTS = "1uU3N7XANV_jvHAaWIRFOrqlhkXd-jmRz"
+# Caminhos para arquivos locais
+FILE_APPLICANTS = Path("datasets/df_applicants.parquet")
+FILE_JOBS = Path("datasets/df_jobs.parquet")
+FILE_PROSPECTS = Path("datasets/df_prospects.parquet")
 
-def download_if_missing(file_id: str, path: Path):
-    if not path.exists():
-        url = f"https://drive.google.com/uc?id={file_id}"
-        print(f"Baixando {path.name} do Google Drive...")
-        gdown.download(url, str(path), quiet=False, fuzzy=True)
-    else:
-        print(f"Arquivo {path.name} já existe localmente.")
 SEED = 42
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
@@ -299,9 +290,9 @@ def pick_req_text(row: pd.Series) -> str:
     return " ".join(p for p in parts if isinstance(p, str))
 
 def load_and_prepare() -> pd.DataFrame:
-    apps = pd.read_csv(ID_APPLICANTS)
-    jobs = pd.read_csv(ID_JOBS)
-    prospects = pd.read_csv(ID_PROSPECTS)
+    apps = pd.read_parquet(FILE_APPLICANTS)
+    jobs = pd.read_parquet(FILE_JOBS)
+    prospects = pd.read_parquet(FILE_PROSPECTS)
 
     df = prospects.merge(apps, on="candidate_id", how="left")
     df = df.merge(jobs, on="job_id", how="left", suffixes=("", "_job"))
@@ -569,6 +560,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
