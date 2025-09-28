@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from ast import literal_eval
 from pathlib import Path
-import gdown
 import altair as alt
 import pandas as pd
 import streamlit as st
@@ -11,44 +10,34 @@ st.set_page_config(page_title="Home - Dashboard", page_icon=":bar_chart:", layou
 st.title(":bar_chart: Visão Geral do Banco de Talentos")
 
 # ---------------------------
-# IDs dos arquivos no Google Drive
+# Caminho para os arquivos locais .parquet
 # ---------------------------
-ID_APPLICANTS = "18QTiuVFUz3i1xO9bXk9GDZeE6uoX__fb"
-ID_JOBS = "1dKkSt5PL-tvCyZOqJvDjTDScFVQgms4c"
-ID_PROSPECTS = "1uU3N7XANV_jvHAaWIRFOrqlhkXd-jmRz"
-
-# Função para criar link direto de download do Google Drive
-def gdrive_parquet_url(file_id: str) -> str:
-    return f"https://drive.google.com/uc?export=download&id={file_id}"
+DATASETS_DIR = Path("datasets")
+PATH_APPLICANTS = DATASETS_DIR / "df_applicants_sample.parquet"
+PATH_JOBS = DATASETS_DIR / "df_jobs.parquet"
+PATH_PROSPECTS = DATASETS_DIR / "df_prospects.parquet"
 
 # ---------------------------
-# Função para carregar datasets direto do Drive
+# Função para carregar datasets
 # ---------------------------
 @st.cache_data(show_spinner=False)
 def load_datasets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    # URLs diretas
-    url_apps = gdrive_parquet_url(ID_APPLICANTS)
-    url_jobs = gdrive_parquet_url(ID_JOBS)
-    url_prospects = gdrive_parquet_url(ID_PROSPECTS)
-
-    # Ler os CSVs diretamente
-    apps = pd.read_parquet(url_apps)
-    jobs = pd.read_parquet(url_jobs)
-    prospects = pd.read_parquet(url_prospects)
-    
+    apps = pd.read_parquet(PATH_APPLICANTS)
+    jobs = pd.read_parquet(PATH_JOBS)
+    prospects = pd.read_parquet(PATH_PROSPECTS)
     return apps, jobs, prospects
 
 # ---------------------------
 # Carregar datasets
 # ---------------------------
 apps, jobs, prospects = load_datasets()
-st.success("✅ Dados carregados com sucesso do Google Drive!")
+st.success("✅ Dados carregados com sucesso dos arquivos locais!")
 
 # ---------------------------
 # KPIs principais
 # ---------------------------
 st.caption(
-    "Os dados abaixo utilizam `df_applicants.csv`, `df_jobs.csv` e `df_prospects.csv` no diretório informado."
+    "Os dados abaixo utilizam os arquivos `.parquet` no diretório `datasets/`."
 )
 
 col1, col2, col3, col4 = st.columns(4)
@@ -137,8 +126,9 @@ col_esp.dataframe(esp_table, hide_index=True, use_container_width=True)
 
 st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
-    'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
+    'Atualize os arquivos `.parquet` em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
