@@ -1,6 +1,8 @@
 # app.py  Formulario padrão + mapeamento de features para o modelo
 import json
 import os
+import streamlit as st
+import pandas as pd
 import re
 import sys
 import unicodedata
@@ -19,10 +21,6 @@ from src.preprocessing import load_applicants, load_jobs
 ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
-
-
-import pandas as pd
-import streamlit as st
 
 def resolve_artifact(rel_path: str) -> str | None:
     """Procura o arquivo em vários lugares plausíveis e retorna o caminho absoluto."""
@@ -130,12 +128,6 @@ def parse_req_sap(req_text, vaga_sap_field=None):
     s = _norm(req_text or "")
     return int(("sap" in s) or ("4hana" in s) or ("s/4hana" in s) or ("s4hana" in s))
 
-import os
-import json
-import io
-import pandas as pd
-from pathlib import Path
-import streamlit as st
 
 # Pegar credenciais do secrets
 os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
@@ -225,18 +217,18 @@ def load_jobs(base_dir=None, uploaded_file=None):
 def render_app(section: str | None = None) -> None:
     st.title("Triagem e Recomendações de Talentos")
 
-# Carregar vagas diretamente do Google Drive
-df_jobs, err = load_jobs(base_dir=None)
-if err:
-    st.error(err.get("error", "Erro desconhecido ao carregar vagas."))
-    st.stop()
+    df_jobs, err = load_jobs(base_dir_default)
+    if err:
+        st.error(err["error"])
+        st.stop()
 
-if df_jobs.empty:
-    st.warning("Nenhuma vaga carregada.")
-    st.stop()
+    if df_jobs.empty:
+        st.warning("Nenhuma vaga carregada.")
+        st.stop()
 
-jobs_indexed = df_jobs.set_index("job_id")
-job_options = jobs_indexed.index.tolist()
+    jobs_indexed = df_jobs.set_index("job_id")
+    job_options = jobs_indexed.index.tolist()
+
 
 def job_label(job_id: str) -> str:
     row = jobs_indexed.loc[job_id]
@@ -263,18 +255,18 @@ with st.expander("Requisitos estimados da vaga", expanded=False):
         f"- Requer SAP: **{'Sim' if sel_row.job_sap_req == 1 else 'Não'}**"
     )
 
-if section is None:
-    tab1, tab2 = st.tabs(['Formulário e Predição', 'Sugestão de Candidatos'])
-    with tab1:
+    if section is None:
+        tab1, tab2 = st.tabs(['Formulário e Predição', 'Sugestão de Candidatos'])
+        with tab1:
+            _render_form(req_text_clean, sel_row, sel_job)
+        with tab2:
+            _render_sourcing()
+    elif section == "form":
         _render_form(req_text_clean, sel_row, sel_job)
-    with tab2:
+    elif section == "sourcing":
         _render_sourcing()
-elif section == "form":
-    _render_form(req_text_clean, sel_row, sel_job)
-elif section == "sourcing":
-    _render_sourcing()
-else:
-    st.error(f"Seção desconhecida: {section}")
+    else:
+        st.error(f"Seo desconhecida: {section}")
 
 # -------------------------
 # Catlogo rpido de skills
@@ -1120,6 +1112,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
