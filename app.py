@@ -13,7 +13,7 @@ st.title(":bar_chart: Visão Geral do Banco de Talentos")
 # Caminho para os arquivos locais .parquet
 # ---------------------------
 DATASETS_DIR = Path("datasets")
-PATH_APPLICANTS = DATASETS_DIR / "df_applicants_sample.parquet"
+PATH_APPLICANTS = DATASETS_DIR / "df_applicants.parquet"
 PATH_JOBS = DATASETS_DIR / "df_jobs.parquet"
 PATH_PROSPECTS = DATASETS_DIR / "df_prospects.parquet"
 
@@ -128,6 +128,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os arquivos `.parquet` em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
