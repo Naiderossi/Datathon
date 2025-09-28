@@ -2,6 +2,7 @@
 """Training script for MLP + LSA candidate-job matching model."""
 from __future__ import annotations
 
+import os
 import json
 import math
 import re
@@ -627,6 +628,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
