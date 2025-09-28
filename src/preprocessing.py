@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Tuple, Set
-import gdown
 import json
 import pandas as pd
 
@@ -118,6 +117,7 @@ __all__ = [
     "load_all",
     "load_vagas_json",
 ]
+
 
 
 
