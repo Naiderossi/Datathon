@@ -7,7 +7,6 @@ import unicodedata
 from html import escape
 from ast import literal_eval
 from pathlib import Path
-import gdown
 import io
 from src.mlp_infer import NUM_COLS, cosine_01
 
@@ -895,7 +894,7 @@ def forward_batch_tab2(weights, X):
 
 @st.cache_resource(show_spinner=False)
 def tab2_get_artifact():
-        pipeline_path = "models/data_pipeline.joblib"
+    pipeline_path = "models/data_pipeline.joblib"
     model_path = "models/model_mlp_lsa.h5"
 
     PIPELINE_URL = "https://drive.google.com/uc?id=1Yk8k8_CJGc9ND3KKwSnEQLQ5BwY8TfYB"
@@ -910,21 +909,9 @@ def tab2_get_artifact():
 
 @st.cache_data(show_spinner=False)
 def tab2_load_base_data():
-    apps = load_applicants().reset_index(),
-        usecols=[
-            'candidate_id', 'nome', 'email', 'telefone', 'pcd',
-            'nivel_ingles', 'nivel_espanhol', 'nivel_academico',
-            'skills_text', 'skills_list',
-            'cv_pt', 'cv_pt_clean', 'cv_pt_clean_noaccents', 'cv_en', 'cv_len_tokens'
-        ]
-    )
-    jobs = load_jobs().reset_index(),
-        usecols=[
-            'job_id', 'titulo_vaga', 'cliente', 'nivel_ingles_req', 'nivel_espanhol_req',
-            'vaga_sap', 'req_text_clean', 'req_text_clean_noaccents', 'req_text', 'req_len_tokens'
-        ]
-    )
-    p prospects = load_prospects()[["candidate_id"]]
+    apps = load_applicants().reset_index()
+    jobs = load_jobs().reset_index()
+    prospects = load_prospects()[["candidate_id"]]
 
     apps = apps.drop_duplicates('candidate_id').set_index('candidate_id')
     for col in ['skills_text', 'cv_pt', 'cv_pt_clean', 'cv_pt_clean_noaccents', 'cv_en']:
@@ -1085,6 +1072,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
