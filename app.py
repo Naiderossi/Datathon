@@ -25,9 +25,8 @@ DATASETS_DIR.mkdir(exist_ok=True)
 # ---------------------------
 def download_if_missing(file_id: str, path: Path):
     if not path.exists():
-        url = f"https://drive.google.com/uc?id={file_id}"
         print(f"Baixando {path.name} do Google Drive...")
-        gdown.download(url, str(path), quiet=False, fuzzy=False)
+        gdown.download(id=file_id, output=str(path), quiet=False)
     else:
         print(f"Arquivo {path.name} já existe localmente.")
 
@@ -153,6 +152,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
