@@ -6,6 +6,24 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 import pyarrow.parquet as pq
+import os
+from kaggle.api.kaggle_api_extended import KaggleApi
+
+# Pegar credenciais do secrets
+os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
+os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
+
+# Autenticar
+api = KaggleApi()
+api.authenticate()
+
+# Baixar dataset privado
+api.dataset_download_files(
+    "naiaraderossi/DatathonDataset",
+    path="data",
+    unzip=True
+)
+
 
 st.set_page_config(page_title="Home - Dashboard", page_icon=":bar_chart:", layout="wide")
 st.title(":bar_chart: Visão Geral do Banco de Talentos")
@@ -129,6 +147,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os arquivos `.parquet` em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
