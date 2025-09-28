@@ -217,6 +217,7 @@ def load_jobs(base_dir=None, uploaded_file=None):
 def render_app(section: str | None = None) -> None:
     st.title("Triagem e Recomendações de Talentos")
 
+    # Carregar as vagas
     df_jobs, err = load_jobs(base_dir_default)
     if err:
         st.error(err["error"])
@@ -229,31 +230,38 @@ def render_app(section: str | None = None) -> None:
     jobs_indexed = df_jobs.set_index("job_id")
     job_options = jobs_indexed.index.tolist()
 
+    # Função auxiliar para formatar label da vaga
+    def job_label(job_id: str) -> str:
+        row = jobs_indexed.loc[job_id]
+        titulo = str(row.get("titulo", "")).strip()
+        cliente = str(row.get("cliente", "")).strip()
+        parts = [str(job_id)]
+        if titulo:
+            parts.append(titulo)
+        if cliente:
+            parts.append(cliente)
+        return " - ".join(parts)
 
-def job_label(job_id: str) -> str:
-    row = jobs_indexed.loc[job_id]
-    titulo = str(row.get("titulo", "")).strip()
-    cliente = str(row.get("cliente", "")).strip()
-    parts = [str(job_id)]
-    if titulo:
-        parts.append(titulo)
-    if cliente:
-        parts.append(cliente)
-    return " - ".join(parts)
-
-st.subheader("Vaga em análise")
-sel_job = st.selectbox("Selecione a vaga", job_options, index=0, format_func=job_label)
-sel_row = jobs_indexed.loc[sel_job]
-req_text_clean = str(sel_row.req_text_clean or "")
-
-with st.expander("Requisitos estimados da vaga", expanded=False):
-    st.markdown(
-        f"- Inglês: **{LEVELS[sel_row.req_ing_ord]}**\n"
-        f"- Espanhol: **{LEVELS[sel_row.req_esp_ord]}**\n"
-        f"- Acadêmico: **{ACADEMICO[sel_row.req_acad_ord]}**\n"
-        f"- PCD requerido: **{'Sim' if sel_row.job_pcd_req == 1 else 'Não'}**\n"
-        f"- Requer SAP: **{'Sim' if sel_row.job_sap_req == 1 else 'Não'}**"
+    # Interface da seleção de vagas
+    st.subheader("Vaga em análise")
+    sel_job = st.selectbox(
+        "Selecione a vaga",
+        job_options,
+        index=0,
+        format_func=job_label
     )
+
+    sel_row = jobs_indexed.loc[sel_job]
+    req_text_clean = str(sel_row.req_text_clean or "")
+
+    with st.expander("Requisitos estimados da vaga", expanded=False):
+        st.markdown(
+            f"- Inglês: **{LEVELS[sel_row.req_ing_ord]}**\n"
+            f"- Espanhol: **{LEVELS[sel_row.req_esp_ord]}**\n"
+            f"- Acadêmico: **{ACADEMICO[sel_row.req_acad_ord]}**\n"
+            f"- PCD requerido: **{'Sim' if sel_row.job_pcd_req == 1 else 'Não'}**\n"
+            f"- Requer SAP: **{'Sim' if sel_row.job_sap_req == 1 else 'Não'}**"
+        )
 
     if section is None:
         tab1, tab2 = st.tabs(['Formulário e Predição', 'Sugestão de Candidatos'])
@@ -1112,6 +1120,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
