@@ -474,7 +474,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
             placeholder="Cole aqui um resumo do currículo ou os tópicos principais",
         )
 
-submitted = form.form_submit_button("Analisar candidato!")
+        submitted = form.form_submit_button("Analisar candidato!")
 
     if not submitted:
         return None  # form não enviado → não segue
@@ -1120,6 +1120,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
