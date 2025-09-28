@@ -542,7 +542,7 @@ try:
     probability = float(artifact.predict_proba(feature_row))
 except Exception as exc:
     st.error(f'Erro na inferência do MLP: {exc}')
-    return
+    st.stop()
 
 score_percent = probability * 100.0
 st.success(f'Aderência estimada para a vaga {job_id}: {score_percent:.1f}%')
@@ -735,13 +735,13 @@ for jid, row in jobs_base.iterrows():
 
 if not suggestions:
     st.info('Nenhuma outra vaga foi encontrada para recomendação.')
-    return
+    st.stop()
 
 suggestions_df = pd.DataFrame(suggestions)
 suggestions_df = suggestions_df[suggestions_df['job_id'] != job_id_str]
 if suggestions_df.empty:
     st.info('Nenhuma outra vaga atinge score relevante neste momento.')
-    return
+    st.stop()
 
 top_suggestions = suggestions_df.sort_values('Score (%)', ascending=False).head(5)
 st.dataframe(top_suggestions[['job_id', 'Vaga', 'Cliente', 'Score (%)']], use_container_width=True)
@@ -1120,4 +1120,5 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
