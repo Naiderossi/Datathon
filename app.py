@@ -29,7 +29,7 @@ def load_datasets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     # URLs diretas
     url_apps = gdrive_csv_url(ID_APPLICANTS)
     url_jobs = gdrive_csv_url(ID_JOBS)
-    url_prospects = gdrive_csv_url(ID_PROSPECTS)
+    url_prospects = gdrive_parquet_url(ID_PROSPECTS)
 
     # Ler os CSVs diretamente
     apps = pd.read_parquet(url_apps)
@@ -139,6 +139,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
