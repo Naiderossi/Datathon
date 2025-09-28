@@ -378,103 +378,105 @@ def extract_req_skills(req_text: str) -> list[str]:
 def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     st.subheader("Formulário de entrevista (padronizado)")
 
-levels_display = [
-    "Sem conhecimento",
-    "Básico",
-    "Intermediário",
-    "Avançado",
-    "Fluente",
-    "Nativo",
-]
-academico_display = [
-    "Fundamental",
-    "Médio",
-    "Técnico",
-    "Tecnólogo",
-    "Graduação",
-    "Pós-graduação",
-    "Mestrado",
-    "Doutorado",
-]
+    levels_display = [
+        "Sem conhecimento",
+        "Básico",
+        "Intermediário",
+        "Avançado",
+        "Fluente",
+        "Nativo",
+    ]
+    academico_display = [
+        "Fundamental",
+        "Médio",
+        "Técnico",
+        "Tecnólogo",
+        "Graduação",
+        "Pós-graduação",
+        "Mestrado",
+        "Doutorado",
+    ]
 
-def level_label(idx: int, catalog: list[str]) -> str:
-    return catalog[idx] if 0 <= idx < len(catalog) else str(idx)
+    def level_label(idx: int, catalog: list[str]) -> str:
+        return catalog[idx] if 0 <= idx < len(catalog) else str(idx)
 
-def segmented_or_radio(label, options, index=0):
-    if hasattr(st, "segmented_control"):
-        try:
-            return st.segmented_control(label=label, options=options, default=options[index])
-        except TypeError:
+    def segmented_or_radio(label, options, index=0):
+        if hasattr(st, "segmented_control"):
             try:
-                val = st.segmented_control(label=label, options=options)
-                return val if val is not None else options[index]
-            except Exception:
-                pass
-    return st.radio(label, options, index=index, horizontal=True)
+                return st.segmented_control(label=label, options=options, default=options[index])
+            except TypeError:
+                try:
+                    val = st.segmented_control(label=label, options=options)
+                    return val if val is not None else options[index]
+                except Exception:
+                    pass
+        return st.radio(label, options, index=index, horizontal=True)
 
-form = st.form("frm_interview")
-with form:
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        nome = st.text_input("Nome *")
-        email = st.text_input("E-mail *")
-        cidade = st.text_input("Cidade/UF")
-    with c2:
-        nivel_ingles = segmented_or_radio("Nível de inglês", LEVELS, index=2)
-        nivel_espanhol = segmented_or_radio("Nível de espanhol", LEVELS, index=0)
-    with c3:
-        nivel_acad = segmented_or_radio("Nível acadêmico", ACADEMICO, index=4)
-        pcd_flag_ui = segmented_or_radio("PCD", ["Não", "Sim"], index=0)
+    form = st.form("frm_interview")
+    with form:
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            nome = st.text_input("Nome *")
+            email = st.text_input("E-mail *")
+            cidade = st.text_input("Cidade/UF")
+        with c2:
+            nivel_ingles = segmented_or_radio("Nível de inglês", levels_display, index=2)
+            nivel_espanhol = segmented_or_radio("Nível de espanhol", levels_display, index=0)
+        with c3:
+            nivel_acad = segmented_or_radio("Nível acadêmico", academico_display, index=4)
+            pcd_flag_ui = segmented_or_radio("PCD", ["Não", "Sim"], index=0)
 
-    st.caption('Skills (tags - digite para filtrar)')
-    skills = st.multiselect(
-        "Selecionar skills",
-        options=DEFAULT_SKILLS,
-        default=[],
-        placeholder='Ex.: SAP, MM, Python...'
-    )
-    skills_extra = st.text_input('Skills extras (vírgulas)')
-
-    suggested_skills = extract_req_skills(req_text_clean)
-    if suggested_skills:
-        competencias_sugeridas = st.multiselect(
-            "Competências sugeridas pela vaga",
-            options=suggested_skills,
-            default=suggested_skills,
-            help="Selecione as competências relevantes para preencher o skill list do candidato.",
+        st.caption("Skills (tags - digite para filtrar)")
+        skills = st.multiselect(
+            "Selecionar skills",
+            options=DEFAULT_SKILLS,
+            default=[],
+            placeholder="Ex.: SAP, MM, Python...",
         )
-    else:
-        competencias_sugeridas = []
-        st.caption("Nenhuma competência sugerida automaticamente para esta vaga.")
+        skills_extra = st.text_input("Skills extras (vírgulas)")
 
-    st.caption("Quesitos comportamentais desejados")
-    behavioral_suggestions = extract_req_behaviors(req_text_clean)
-    comportamento_opcoes = (
-        behavioral_suggestions if behavioral_suggestions else DEFAULT_BEHAVIORAL_TRAITS
-    )
-    comportamentos_escolhidos = st.multiselect(
-        "Competências comportamentais",
-        options=comportamento_opcoes,
-        default=behavioral_suggestions,
-        help="Selecione atributos comportamentais alinhados ao perfil da vaga.",
-    )
-    comportamentos_extra = st.text_input("Outros quesitos comportamentais (vírgulas)")
+        suggested_skills = extract_req_skills(req_text_clean)
+        if suggested_skills:
+            competencias_sugeridas = st.multiselect(
+                "Competências sugeridas pela vaga",
+                options=suggested_skills,
+                default=suggested_skills,
+                help="Selecione as competências relevantes para preencher o skill list do candidato.",
+            )
+        else:
+            competencias_sugeridas = []
+            st.caption("Nenhuma competência sugerida automaticamente para esta vaga.")
 
-    comportamentos_registrados = set(comportamentos_escolhidos)
-    if comportamentos_extra:
-        comportamentos_registrados.update(
-            {item.strip() for item in comportamentos_extra.split(',') if item.strip()}
+        st.caption("Quesitos comportamentais desejados")
+        behavioral_suggestions = extract_req_behaviors(req_text_clean)
+        comportamento_opcoes = (
+            behavioral_suggestions if behavioral_suggestions else DEFAULT_BEHAVIORAL_TRAITS
         )
-    st.session_state["form_comportamentos"] = sorted(comportamentos_registrados)
+        comportamentos_escolhidos = st.multiselect(
+            "Competências comportamentais",
+            options=comportamento_opcoes,
+            default=behavioral_suggestions,
+            help="Selecione atributos comportamentais alinhados ao perfil da vaga.",
+        )
+        comportamentos_extra = st.text_input("Outros quesitos comportamentais (vírgulas)")
 
-    st.caption('Resumo do CV (texto livre - pode colar trechos do currículo)')
-    cv_text = st.text_area(
-        "CV (texto livre)",
-        height=160,
-        placeholder="Cole aqui um resumo do currículo ou os tópicos principais",
-    )
+        comportamentos_registrados = set(comportamentos_escolhidos)
+        if comportamentos_extra:
+            comportamentos_registrados.update(
+                {item.strip() for item in comportamentos_extra.split(",") if item.strip()}
+            )
+        st.session_state["form_comportamentos"] = sorted(comportamentos_registrados)
 
-    submitted = form.form_submit_button('Analisar candidato!')
+        st.caption("Resumo do CV (texto livre - pode colar trechos do currículo)")
+        cv_text = st.text_area(
+            "CV (texto livre)",
+            height=160,
+            placeholder="Cole aqui um resumo do currículo ou os tópicos principais",
+        )
+
+        submitted = form.form_submit_button("Analisar candidato!")
+
+    return submitted
 
 if not submitted:
     st.stop()
@@ -1120,6 +1122,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
