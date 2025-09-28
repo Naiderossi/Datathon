@@ -693,7 +693,7 @@ try:
     _apps, jobs_base, _prospects = tab2_load_base_data()
 except Exception as exc:
     st.info(f'Não foi possível carregar a base de vagas para recomendação: {exc}')
-    return
+    st.stop()
 
 suggestions = []
 job_id_str = str(job_id)
@@ -1120,5 +1120,6 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
