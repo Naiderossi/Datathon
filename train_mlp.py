@@ -19,11 +19,12 @@ from sklearn.metrics import (classification_report, confusion_matrix,
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
-from kaggle.api.kaggle_api_extended import KaggleApi
 
 # Pegar credenciais do secrets
 os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
 os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
+
+from kaggle.api.kaggle_api_extended import KaggleApi
 
 # Autenticar
 api = KaggleApi()
@@ -627,6 +628,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
