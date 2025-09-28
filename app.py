@@ -13,12 +13,12 @@ st.title(":bar_chart: Visão Geral do Banco de Talentos")
 # ---------------------------
 # IDs dos arquivos no Google Drive
 # ---------------------------
-ID_APPLICANTS = "1Nr1iMwYy-tFqzWpvd2PJuDnYLY1Kv459"
-ID_JOBS = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
-ID_PROSPECTS = "1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
+ID_APPLICANTS = "18QTiuVFUz3i1xO9bXk9GDZeE6uoX__fb"
+ID_JOBS = "1dKkSt5PL-tvCyZOqJvDjTDScFVQgms4c"
+ID_PROSPECTS = "1uU3N7XANV_jvHAaWIRFOrqlhkXd-jmRz"
 
 # Função para criar link direto de download do Google Drive
-def gdrive_csv_url(file_id: str) -> str:
+def gdrive_parquet_url(file_id: str) -> str:
     return f"https://drive.google.com/uc?export=download&id={file_id}"
 
 # ---------------------------
@@ -32,9 +32,9 @@ def load_datasets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     url_prospects = gdrive_csv_url(ID_PROSPECTS)
 
     # Ler os CSVs diretamente
-    apps = pd.read_csv(url_apps)
-    jobs = pd.read_csv(url_jobs)
-    prospects = pd.read_csv(url_prospects)
+    apps = pd.read_parquet(url_apps)
+    jobs = pd.read_parquet(url_jobs)
+    prospects = pd.read_parquet(url_prospects)
     
     return apps, jobs, prospects
 
@@ -139,6 +139,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
