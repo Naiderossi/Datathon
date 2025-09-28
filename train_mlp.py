@@ -19,11 +19,35 @@ from sklearn.metrics import (classification_report, confusion_matrix,
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
+from kaggle.api.kaggle_api_extended import KaggleApi
 
-# Caminhos para arquivos locais
-FILE_APPLICANTS = Path("datasets/df_applicants.parquet")
-FILE_JOBS = Path("datasets/df_jobs.parquet")
-FILE_PROSPECTS = Path("datasets/df_prospects.parquet")
+# Pegar credenciais do secrets
+os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["naiaraderossi"]
+os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["d28221bf240b315ab14bdb371599aeb6"]
+
+# Autenticar
+api = KaggleApi()
+api.authenticate()
+
+# Baixar dataset privado
+api.dataset_download_files(
+    "naiaraderossi/DatathonDataset",
+    path="data",
+    unzip=True
+)
+
+# ---------------------------
+# Baixar dataset privado
+# ---------------------------
+DATASETS_DIR = Path("data")
+DATASETS_DIR.mkdir(exist_ok=True)
+
+# ---------------------------
+# Arquivos CSV baixados
+# ---------------------------
+PATH_APPLICANTS = DATASETS_DIR / "df_applicants.csv"
+PATH_JOBS = DATASETS_DIR / "df_jobs.csv"
+PATH_PROSPECTS = DATASETS_DIR / "df_prospects.csv"
 
 SEED = 42
 np.random.seed(SEED)
@@ -290,9 +314,9 @@ def pick_req_text(row: pd.Series) -> str:
     return " ".join(p for p in parts if isinstance(p, str))
 
 def load_and_prepare() -> pd.DataFrame:
-    apps = pd.read_parquet(FILE_APPLICANTS)
-    jobs = pd.read_parquet(FILE_JOBS)
-    prospects = pd.read_parquet(FILE_PROSPECTS)
+    apps = pd.read_csvt(PATH_APPLICANTS)
+    jobs = pd.read_csv(PATH_JOBS)
+    prospects = pd.read_csv(PATH_PROSPECTS)
 
     df = prospects.merge(apps, on="candidate_id", how="left")
     df = df.merge(jobs, on="job_id", how="left", suffixes=("", "_job"))
@@ -507,10 +531,29 @@ def train_model(df: pd.DataFrame) -> dict:
     }
     return artefacts
 
+import joblib
+try:
+    import streamlit as st
+    USE_STREAMLIT_SECRETS = True
+except ImportError:
+    USE_STREAMLIT_SECRETS = False
+
+def download_pipeline_from_kaggle() -> Path:
+        api.dataset_download_files(
+        "naiaraderossi/DatathonDataset", 
+        path=data_dir,
+        unzip=True
+    )
+
+    return data_dir / "data_pipeline.joblib"
+
 def main() -> None:
     df = load_and_prepare()
     artefacts = train_model(df)
 
+    # ---------------------------
+    # Pastas e caminhos
+    # ---------------------------
     models_dir = Path("models")
     models_dir.mkdir(exist_ok=True)
 
@@ -520,11 +563,25 @@ def main() -> None:
     registry_path = models_dir / "registry.json"
     report_path = models_dir / "training_report.json"
 
-    import joblib
+    # ---------------------------
+    # Salvar pipeline
+    # ---------------------------
+    if not pipeline_path.exists():
+        # Se estiver em ambiente remoto, baixar do Kaggle
+        if USE_STREAMLIT_SECRETS:
+            print("Pipeline não encontrado. Baixando do Kaggle...")
+            pipeline_path = download_pipeline_from_kaggle()
 
     joblib.dump(artefacts["pipeline"], pipeline_path)
+
+    # ---------------------------
+    # Salvar modelo
+    # ---------------------------
     artefacts["model"].save(model_path, include_optimizer=False)
 
+    # ---------------------------
+    # Salvar thresholds
+    # ---------------------------
     best_thr = artefacts["metrics"]["best_threshold"]
     thr_payload = {
         "mlp_thresholds": {
@@ -534,6 +591,9 @@ def main() -> None:
     }
     thresholds_path.write_text(json.dumps(thr_payload, indent=2), encoding="utf-8")
 
+    # ---------------------------
+    # Salvar registry
+    # ---------------------------
     registry_payload = {
         "model_type": "mlp_lsa",
         "pipeline": str(pipeline_path),
@@ -546,17 +606,24 @@ def main() -> None:
     }
     registry_path.write_text(json.dumps(registry_payload, indent=2), encoding="utf-8")
 
+    # ---------------------------
+    # Salvar relatório de treino
+    # ---------------------------
     artefacts_serializable = artefacts.copy()
     artefacts_serializable.pop("model", None)
     artefacts_serializable.pop("pipeline", None)
     report_path.write_text(json.dumps(artefacts_serializable, indent=2), encoding="utf-8")
 
+    # ---------------------------
+    # Mensagens
+    # ---------------------------
     print("Artifacts saved:")
     print("-", pipeline_path)
     print("-", model_path)
     print("-", thresholds_path)
     print("-", registry_path)
     print("Best F1: %.4f (threshold=%.4f)" % (artefacts["metrics"]["best_f1"], artefacts["metrics"]["best_threshold"]))
+
 
 if __name__ == "__main__":
     main()
