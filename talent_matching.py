@@ -154,72 +154,71 @@ VAGAS_FILENAME = "vagas.json"
 # ----------------------------
 @st.cache_data
 def load_jobs(base_dir=None, uploaded_file=None):
-"""
-Carrega vagas do Kaggle ou de upload do usuário.
-Se base_dir=None, usa pasta local 'data/'.
-"""
-# Definir pasta local
-if base_dir is None:
-    base_dir = Path("data")
-else:
-    base_dir = Path(base_dir)
+    """
+    Carrega vagas do Kaggle ou de upload do usuário.
+    Se base_dir=None, usa pasta local 'data/'.
+    """
+    # Definir pasta local
+    if base_dir is None:
+        base_dir = Path("data")
+    else:
+        base_dir = Path(base_dir)
 
-base_dir.mkdir(exist_ok=True)
-path = base_dir / VAGAS_FILENAME
+    base_dir.mkdir(exist_ok=True)
+    path = base_dir / VAGAS_FILENAME
 
-# Baixar do Kaggle se não existir
-if not path.exists():
-    st.info(f"Arquivo {VAGAS_FILENAME} não encontrado localmente. Baixando do Kaggle...")
-    
-    api = KaggleApi()
-    api.authenticate()
-
-    api.dataset_download_files(
-        KAGGLE_DATASET,
-        path=base_dir,
-        unzip=True
-    )
-
+    # Baixar do Kaggle se não existir
     if not path.exists():
-        return pd.DataFrame(), {"error": f"Arquivo não encontrado após download: {path}"}
+        st.info(f"Arquivo {VAGAS_FILENAME} não encontrado localmente. Baixando do Kaggle...")
+        api = KaggleApi()
+        api.authenticate()
 
-# Usar upload do usuário se fornecido
-if uploaded_file is not None:
-    vagas = json.load(io.TextIOWrapper(uploaded_file, encoding='utf-8'))
-else:
-    with open(path, "r", encoding="utf-8") as f:
-        vagas = json.load(f)
+        api.dataset_download_files(
+            KAGGLE_DATASET,
+            path=base_dir,
+            unzip=True
+        )
 
-# Transformar JSON em DataFrame
-rows = []
-for jid, j in vagas.items():
-    ib = j.get("informacoes_basicas", {})
-    pv = j.get("perfil_vaga", {})
-    req_text = " ".join([
-        str(ib.get("titulo_vaga","")),
-        str(ib.get("descricao_vaga","")),
-        str(pv.get("principais_atividades","")),
-        str(pv.get("competencia_tecnicas_e_comportamentais","")),
-        str(pv.get("conhecimentos_tecnicos","")),
-        str(pv.get("requisitos_desejaveis",""))
-    ]).strip()
-    rows.append({
-        "job_id": str(jid),
-        "titulo": ib.get("titulo_vaga",""),
-        "cliente": ib.get("cliente",""),
-        "req_text_clean": req_text,
-        "vaga_sap_raw": ib.get("vaga_sap","")
-    })
-df = pd.DataFrame(rows)
+        if not path.exists():
+            return pd.DataFrame(), {"error": f"Arquivo não encontrado após download: {path}"}
 
-# Requisitos derivados do texto
-df["req_ing_ord"]  = df["req_text_clean"].apply(lambda t: int(parse_req_lang(t,"ingles") or 0))
-df["req_esp_ord"]  = df["req_text_clean"].apply(lambda t: int(parse_req_lang(t,"espanhol") or 0))
-df["req_acad_ord"] = df["req_text_clean"].apply(lambda t: int(parse_req_acad(t) or 0))
-df["job_pcd_req"]  = df["req_text_clean"].apply(lambda t: int(parse_req_pcd(t) or 0))
-df["job_sap_req"]  = df.apply(lambda r: int(parse_req_sap(r["req_text_clean"], r["vaga_sap_raw"]) or 0), axis=1)
+    # Usar upload do usuário se fornecido
+    if uploaded_file is not None:
+        vagas = json.load(io.TextIOWrapper(uploaded_file, encoding='utf-8'))
+    else:
+        with open(path, "r", encoding="utf-8") as f:
+            vagas = json.load(f)
 
-return df, {}
+    # Transformar JSON em DataFrame
+    rows = []
+    for jid, j in vagas.items():
+        ib = j.get("informacoes_basicas", {})
+        pv = j.get("perfil_vaga", {})
+        req_text = " ".join([
+            str(ib.get("titulo_vaga","")),
+            str(ib.get("descricao_vaga","")),
+            str(pv.get("principais_atividades","")),
+            str(pv.get("competencia_tecnicas_e_comportamentais","")),
+            str(pv.get("conhecimentos_tecnicos","")),
+            str(pv.get("requisitos_desejaveis",""))
+        ]).strip()
+        rows.append({
+            "job_id": str(jid),
+            "titulo": ib.get("titulo_vaga",""),
+            "cliente": ib.get("cliente",""),
+            "req_text_clean": req_text,
+            "vaga_sap_raw": ib.get("vaga_sap","")
+        })
+    df = pd.DataFrame(rows)
+
+    # Requisitos derivados do texto
+    df["req_ing_ord"]  = df["req_text_clean"].apply(lambda t: int(parse_req_lang(t,"ingles") or 0))
+    df["req_esp_ord"]  = df["req_text_clean"].apply(lambda t: int(parse_req_lang(t,"espanhol") or 0))
+    df["req_acad_ord"] = df["req_text_clean"].apply(lambda t: int(parse_req_acad(t) or 0))
+    df["job_pcd_req"]  = df["req_text_clean"].apply(lambda t: int(parse_req_pcd(t) or 0))
+    df["job_sap_req"]  = df.apply(lambda r: int(parse_req_sap(r["req_text_clean"], r["vaga_sap_raw"]) or 0), axis=1)
+
+    return df, {}
 # ----------------------------
 # Renderização principal
 # ----------------------------
