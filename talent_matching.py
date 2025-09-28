@@ -477,7 +477,7 @@ with form:
     submitted = form.form_submit_button('Analisar candidato!')
 
 if not submitted:
-    return
+    st.stop()
 
 missing = []
 if not nome.strip():
@@ -488,20 +488,20 @@ if not cv_text.strip():
     missing.append('currículo (texto livre)')
 if missing:
     st.warning('Preencha os campos obrigatórios: ' + ', '.join(missing))
-    return
+    st.stop()
 
 if not HAS_MLP:
     st.error('Modelo MLP não disponível. Garanta que os artefatos estejam na pasta `models/`.')
-    return
+    st.stop()
 
 try:
     artifact = tab2_get_artifact()
 except FileNotFoundError as exc:
     st.error(f'Artefato do modelo não encontrado: {exc}')
-    return
+    st.stop()
 except Exception as exc:
     st.error(f'Não foi possível carregar o modelo: {exc}')
-    return
+    st.stop()
 
 extras = [item.strip() for item in skills_extra.split(',') if item.strip()]
 combined_skills = skills + competencias_sugeridas + extras
@@ -1120,3 +1120,4 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
