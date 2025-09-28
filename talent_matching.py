@@ -8,6 +8,7 @@ from html import escape
 from ast import literal_eval
 from pathlib import Path
 import gdown
+import io
 from src.mlp_infer import NUM_COLS, cosine_01
 from train_mlp import pick_cv_text, pick_req_text
 
@@ -117,29 +118,40 @@ def parse_req_sap(req_text, vaga_sap_field=None):
     s = _norm(req_text or "")
     return int(("sap" in s) or ("4hana" in s) or ("s/4hana" in s) or ("s4hana" in s))
 
-# -----------------------------------
-# Carregamento simples de "vagas.json" via Google Drive
-# -----------------------------------
-ID_VAGAS_JSON = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"  # ID do Google Drive
+# ----------------------------
+# Configuração Google Drive
+# ----------------------------
+ID_VAGAS_JSON = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"  # ID do arquivo vagas.json
 
+# ----------------------------
+# Função para carregar vagas
+# ----------------------------
 @st.cache_data
-def load_jobs(base_dir="datasets", uploaded_file=None):
-    import json, os
-    path = os.path.join(base_dir,"vagas.json")
-    
-    # Baixar do Google Drive se não existir
-    if not os.path.exists(path):
-        download_if_missing(ID_VAGAS_JSON, Path(path))
-
-    # Preferir upload se o usuário enviou
-    if uploaded_file is not None:
-        vagas = json.load(uploaded_file)
+def load_jobs(base_dir=None, uploaded_file=None):
+    """
+    Carrega vagas diretamente do Google Drive ou de upload do usuário.
+    Se base_dir=None, não utiliza pasta local.
+    """
+    # Definir path do arquivo
+    if base_dir is None:
+        path = Path("vagas.json")
     else:
-        if not os.path.exists(path):
-            return pd.DataFrame(), {"error": f"Arquivo no encontrado: {path}"}
+        path = Path(base_dir) / "vagas.json"
+
+    # Baixar do Google Drive se não existir
+    if not path.exists():
+        gdown.download(f"https://drive.google.com/uc?id={ID_VAGAS_JSON}", str(path), quiet=False)
+
+    # Usar upload do usuário se fornecido
+    if uploaded_file is not None:
+        vagas = json.load(io.TextIOWrapper(uploaded_file, encoding='utf-8'))
+    else:
+        if not path.exists():
+            return pd.DataFrame(), {"error": f"Arquivo não encontrado: {path}"}
         with open(path, "r", encoding="utf-8") as f:
             vagas = json.load(f)
 
+    # Transformar JSON em DataFrame
     rows = []
     for jid, j in vagas.items():
         ib = j.get("informacoes_basicas", {})
@@ -162,24 +174,22 @@ def load_jobs(base_dir="datasets", uploaded_file=None):
     df = pd.DataFrame(rows)
 
     # Requisitos derivados do texto
-    df["req_ing_ord"]  = df["req_text_clean"].apply(lambda t: parse_req_lang(t,"ingles")).astype(int)
-    df["req_esp_ord"]  = df["req_text_clean"].apply(lambda t: parse_req_lang(t,"espanhol")).astype(int)
-    df["req_acad_ord"] = df["req_text_clean"].apply(parse_req_acad).astype(int)
-    df["job_pcd_req"]  = df["req_text_clean"].apply(parse_req_pcd).astype(int)
-    df["job_sap_req"]  = df.apply(lambda r: parse_req_sap(r["req_text_clean"], r["vaga_sap_raw"]), axis=1).astype(int)
+    df["req_ing_ord"]  = df["req_text_clean"].apply(lambda t: int(parse_req_lang(t,"ingles") or 0))
+    df["req_esp_ord"]  = df["req_text_clean"].apply(lambda t: int(parse_req_lang(t,"espanhol") or 0))
+    df["req_acad_ord"] = df["req_text_clean"].apply(lambda t: int(parse_req_acad(t) or 0))
+    df["job_pcd_req"]  = df["req_text_clean"].apply(lambda t: int(parse_req_pcd(t) or 0))
+    df["job_sap_req"]  = df.apply(lambda r: int(parse_req_sap(r["req_text_clean"], r["vaga_sap_raw"]) or 0), axis=1)
     
     return df, {}
-# -------------------
-# Sidebar: seleção
-# -------------------
-base_dir_default = Path(ROOT_DIR / "datasets")
-base_dir_default.mkdir(exist_ok=True)  # garante que a pasta exista
 
+# ----------------------------
+# Renderização principal
+# ----------------------------
 def render_app(section: str | None = None) -> None:
     st.title("Triagem e Recomendações de Talentos")
 
-    # Carregar vagas (irá baixar do Drive se necessário)
-    df_jobs, err = load_jobs(base_dir=str(base_dir_default))
+    # Carregar vagas diretamente do Google Drive
+    df_jobs, err = load_jobs(base_dir=None)
     if err:
         st.error(err.get("error", "Erro desconhecido ao carregar vagas."))
         st.stop()
@@ -227,7 +237,7 @@ def render_app(section: str | None = None) -> None:
     elif section == "sourcing":
         _render_sourcing()
     else:
-        st.error(f"Seo desconhecida: {section}")
+        st.error(f"Seção desconhecida: {section}")
 
     # -------------------------
     # Catlogo rpido de skills
@@ -1062,6 +1072,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
