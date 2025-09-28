@@ -23,9 +23,9 @@ import tensorflow as tf
 # ---------------------------
 # IDs dos arquivos no Google Drive
 # ---------------------------
-ID_APPLICANTS = "1bsRtUSZaYSScpkDfluP45bHxnoVe8tKm"
-ID_JOBS = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
-ID_PROSPECTS = "1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
+ID_APPLICANTS = "18QTiuVFUz3i1xO9bXk9GDZeE6uoX__fb"
+ID_JOBS = "1dKkSt5PL-tvCyZOqJvDjTDScFVQgms4c"
+ID_PROSPECTS = "1uU3N7XANV_jvHAaWIRFOrqlhkXd-jmRz"
 
 def download_if_missing(file_id: str, path: Path):
     if not path.exists():
@@ -569,5 +569,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
