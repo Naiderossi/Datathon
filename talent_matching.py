@@ -10,6 +10,7 @@ from pathlib import Path
 import gdown
 import io
 from src.mlp_infer import NUM_COLS, cosine_01
+
 from train_mlp import pick_cv_text, pick_req_text
 from src.utils import safe_list_parse
 from src.preprocessing import load_applicants, load_jobs
@@ -894,8 +895,18 @@ def forward_batch_tab2(weights, X):
 
 @st.cache_resource(show_spinner=False)
 def tab2_get_artifact():
-    return MLPArtifact('models/data_pipeline.joblib', 'models/model_mlp_lsa.h5')
+        pipeline_path = "models/data_pipeline.joblib"
+    model_path = "models/model_mlp_lsa.h5"
 
+    PIPELINE_URL = "https://drive.google.com/uc?id=1Yk8k8_CJGc9ND3KKwSnEQLQ5BwY8TfYB"
+    os.makedirs("models", exist_ok=True)
+
+    # Baixa o pipeline se não existir
+    if not os.path.exists(pipeline_path):
+        with st.spinner("⬇️ Baixando pipeline do Google Drive..."):
+            gdown.download(PIPELINE_URL, pipeline_path, quiet=False)
+
+    return MLPArtifact(pipeline_path, model_path)
 
 @st.cache_data(show_spinner=False)
 def tab2_load_base_data():
@@ -1074,6 +1085,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
