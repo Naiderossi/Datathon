@@ -17,37 +17,24 @@ ID_APPLICANTS = "1Nr1iMwYy-tFqzWpvd2PJuDnYLY1Kv459"
 ID_JOBS = "1cH8Yebtk58xhox7FMypSlEOOXfNMMPFZ"
 ID_PROSPECTS = "1BeSSet5NhCY5axY6Gr2FLaUVONrFKHJ0"
 
-DATASETS_DIR = Path("datasets")
-DATASETS_DIR.mkdir(exist_ok=True)
+# Função para criar link direto de download do Google Drive
+def gdrive_csv_url(file_id: str) -> str:
+    return f"https://drive.google.com/uc?export=download&id={file_id}"
 
 # ---------------------------
-# Função auxiliar de download
-# ---------------------------
-def download_if_missing(file_id: str, path: Path):
-    if not path.exists():
-        print(f"Baixando {path.name} do Google Drive...")
-        gdown.download(id=file_id, output=str(path), quiet=False)
-    else:
-        print(f"Arquivo {path.name} já existe localmente.")
-
-# ---------------------------
-# Função para carregar datasets
+# Função para carregar datasets direto do Drive
 # ---------------------------
 @st.cache_data(show_spinner=False)
 def load_datasets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    path_apps = DATASETS_DIR / "df_applicants.csv"
-    path_jobs = DATASETS_DIR / "df_jobs.csv"
-    path_prospects = DATASETS_DIR / "df_prospects.csv"
+    # URLs diretas
+    url_apps = gdrive_csv_url(ID_APPLICANTS)
+    url_jobs = gdrive_csv_url(ID_JOBS)
+    url_prospects = gdrive_csv_url(ID_PROSPECTS)
 
-    # Baixar arquivos se não existirem
-    download_if_missing(ID_APPLICANTS, path_apps)
-    download_if_missing(ID_JOBS, path_jobs)
-    download_if_missing(ID_PROSPECTS, path_prospects)
-
-    # Ler os CSVs
-    apps = pd.read_csv(path_apps)
-    jobs = pd.read_csv(path_jobs)
-    prospects = pd.read_csv(path_prospects)
+    # Ler os CSVs diretamente
+    apps = pd.read_csv(url_apps)
+    jobs = pd.read_csv(url_jobs)
+    prospects = pd.read_csv(url_prospects)
     
     return apps, jobs, prospects
 
@@ -152,6 +139,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os CSVs em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
