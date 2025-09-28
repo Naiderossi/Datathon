@@ -545,8 +545,7 @@ def download_pipeline_from_kaggle() -> Path:
         path=data_dir,
         unzip=True
     )
-
-    return data_dir / "data_pipeline.joblib"
+  return data_dir / "data_pipeline.joblib"
 
 def main() -> None:
     df = load_and_prepare()
@@ -628,6 +627,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
