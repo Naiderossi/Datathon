@@ -540,7 +540,7 @@ except ImportError:
     USE_STREAMLIT_SECRETS = False
 
 def download_pipeline_from_kaggle() -> Path:
-        api.dataset_download_files(
+    api.dataset_download_files(
         "naiaraderossi/DatathonDataset", 
         path=data_dir,
         unzip=True
@@ -627,6 +627,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
