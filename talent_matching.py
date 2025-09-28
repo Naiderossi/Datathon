@@ -157,8 +157,8 @@ def load_jobs(base_dir=None, uploaded_file=None):
     if not path.exists():
         st.info(f"Arquivo {VAGAS_FILENAME} não encontrado localmente. Baixando do Kaggle...")
         # Configurar credenciais
-        os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["naiaraderossi"]
-        os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["d28221bf240b315ab14bdb371599aeb6"]
+        os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
+        os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
 
         api = KaggleApi()
         api.authenticate()
@@ -1095,6 +1095,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
