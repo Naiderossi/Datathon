@@ -5,6 +5,7 @@ from pathlib import Path
 import altair as alt
 import pandas as pd
 import streamlit as st
+import pyarrow.parquet as pq
 
 st.set_page_config(page_title="Home - Dashboard", page_icon=":bar_chart:", layout="wide")
 st.title(":bar_chart: Visão Geral do Banco de Talentos")
@@ -128,6 +129,7 @@ st.caption(
     'Use este painel como ponto de partida para identificar perfis estratégicos, carências de idiomas e clientes com maior volume de vagas. '
     'Atualize os arquivos `.parquet` em `datasets/` e recarregue a página para refletir os dados mais recentes.'
 )
+
 
 
 
