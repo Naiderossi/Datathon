@@ -15,13 +15,12 @@ from .utils import (
     safe_list_parse,
 )
 
-
-from kaggle.api.kaggle_api_extended import KaggleApi
-
 # Pegar credenciais do secrets
 os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
 os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
 
+
+from kaggle.api.kaggle_api_extended import KaggleApi
 # Autenticar
 api = KaggleApi()
 api.authenticate()
@@ -151,6 +150,7 @@ __all__ = [
     "load_all",
     "load_vagas_json",
 ]
+
 
 
 
