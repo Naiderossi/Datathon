@@ -127,6 +127,11 @@ import io
 import pandas as pd
 from pathlib import Path
 import streamlit as st
+
+# Pegar credenciais do secrets
+os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
+os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
+
 from kaggle.api.kaggle_api_extended import KaggleApi
 
 # ----------------------------
@@ -156,10 +161,7 @@ def load_jobs(base_dir=None, uploaded_file=None):
     # Baixar do Kaggle se não existir
     if not path.exists():
         st.info(f"Arquivo {VAGAS_FILENAME} não encontrado localmente. Baixando do Kaggle...")
-        # Configurar credenciais
-        os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
-        os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
-
+       
         api = KaggleApi()
         api.authenticate()
 
@@ -1095,6 +1097,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
