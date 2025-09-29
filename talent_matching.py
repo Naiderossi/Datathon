@@ -50,6 +50,42 @@ def _norm(s: str) -> str:
     s = re.sub(r"\s+", " ", s)
     return s
 
+def _ensure_jobs_index(jobs: pd.DataFrame) -> pd.DataFrame:
+    # Se existir job_id como coluna, usar como índice; senão, manter como está
+    if "job_id" in jobs.columns and jobs.index.name != "job_id":
+        jobs = jobs.drop_duplicates(subset=["job_id"]).set_index("job_id", drop=False)
+    # Index consistente (tipagem estável); NÃO converto para str para não quebrar lógicas posteriores
+    if not jobs.index.is_unique:
+        jobs = jobs[~jobs.index.duplicated(keep="first")]
+    return jobs
+
+def _pick_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    for c in candidates:
+        if c in df.columns:
+            return c
+    return None
+
+def _build_job_labels(jobs: pd.DataFrame) -> tuple[list, dict]:
+    """Retorna (options, labels_map) com rótulos precomputados, sem DataFrame dentro do format_func."""
+    title_col  = _pick_col(jobs, ["titulo", "titulo_vaga", "title", "job_title", "vaga", "posição", "position"])
+    client_col = _pick_col(jobs, ["cliente", "empresa", "company", "cliente_nome"])
+
+    labels = {}
+    # Lista de opções respeitando a ordem do DF e sem duplicatas
+    options = list(dict.fromkeys(list(jobs.index)))
+
+    for j in options:
+        row = jobs.loc[j] if j in jobs.index else {}
+        parts = [str(j)]
+        if title_col:
+            parts.append(str((row[title_col] if title_col in jobs.columns else "")).strip())
+        if client_col:
+            parts.append(str((row[client_col] if client_col in jobs.columns else "")).strip())
+        label = " - ".join([p for p in parts if p])
+        labels[j] = label or str(j)
+
+    return options, labels
+
 LEVELS = ['Sem conhecimento','Básico','Intermediário','Avançado','Fluente','Nativo']
 ACADEMICO = ['Fundamental','Médio','Técnico','Tecnólogo','Graduação','Pós-graduação','Mestrado','Doutorado']
 
@@ -381,7 +417,7 @@ def extract_req_skills(req_text: str) -> list[str]:
     return result
 
 # -------------------------
-# FormulÃ¡rio padrÃ£onizado
+# Formulario padronizado
 # -------------------------
 
 def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
@@ -769,108 +805,137 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     st.dataframe(top_suggestions[["job_id", "Vaga", "Cliente", "Score (%)"]], width="stretch")
 
 def _render_sourcing() -> None:
-    
-    apps_tab2, jobs_tab2, prospect_ids_tab2 = tab2_load_base_data()
-    if jobs_tab2 is None or jobs_tab2.empty:
-        st.info("Nenhuma vaga encontrada na base.")
-        return
-
-    # seletor único
-    job_options_tab2 = jobs_tab2.index.tolist()
-    def job_label(j):
-        try:
-            titulo = str(jobs_tab2.at[j, "titulo"]) if "titulo" in jobs_tab2.columns else ""
-            cliente = str(jobs_tab2.at[j, "cliente"]) if "cliente" in jobs_tab2.columns else ""
-            return " - ".join([str(j)] + [x for x in [titulo, cliente] if x])
-        except Exception:
-            return str(j)
-
-    job_id_tab2 = st.selectbox("Selecione a vaga", job_options_tab2, format_func=job_label)
-    st.session_state["selected_job_id"] = job_id_tab2
-
-    # threshold com fallback
-    thr_default = 0.34
     try:
-        meta = json.loads(Path("models/thresholds.json").read_text(encoding="utf-8"))
-        thr_default = float(meta.get("mlp_thresholds", {}).get("thr_f1", thr_default))
-    except Exception:
-        pass
+        st.subheader("Sugestão de candidatos livres")
 
-    threshold_tab2 = st.slider("Threshold (probabilidade mínima)", 0.0, 1.0, float(thr_default), 0.01)
-    max_results_tab2 = st.slider("Quantidade máxima de candidatos", 10, 200, 50, 10)
+        # Base
+        apps_tab2, jobs_tab2, prospect_ids_tab2 = tab2_load_base_data()
+        if jobs_tab2 is None or jobs_tab2.empty:
+            st.info("Nenhuma vaga encontrada na base.")
+            return
 
-    available_candidates = apps_tab2.index.difference(prospect_ids_tab2)
-    if available_candidates.empty:
-        st.info("Nenhum candidato livre encontrado.")
-        return
+        # 1) Padroniza índice/duplicatas e pré-computa rótulos (NÃO tocar no DF no format_func)
+        jobs_tab2 = _ensure_jobs_index(jobs_tab2)
+        job_options_tab2, job_labels_map = _build_job_labels(jobs_tab2)
+        if not job_options_tab2:
+            st.info("Nenhuma vaga encontrada.")
+            return
 
-    if st.button("Buscar candidatos sugeridos", type="primary"):
+        def _fmt_job(j):
+            # apenas dicionário em memória (evita crashes durante renderização)
+            return job_labels_map.get(j, str(j))
+
+        job_id_tab2 = st.selectbox(
+            "Selecione a vaga",
+            job_options_tab2,
+            format_func=_fmt_job,
+            key="sel_job_tab2",   # evita colisão com outros selects
+        )
+        st.session_state["selected_job_id"] = job_id_tab2
+
+        # 2) Threshold com fallback robusto
+        thr_default = 0.34
         try:
-            job_row = jobs_tab2.loc[job_id_tab2]
-            req_text = pick_req_text(job_row)
-            req_ing_ord = map_level(job_row.get("nivel_ingles_req"))
-            req_esp_ord = map_level(job_row.get("nivel_espanhol_req"))
-            req_acad_ord = parse_req_acad(req_text)
-            job_pcd_req = parse_req_pcd(req_text)
-            job_sap_req = parse_req_sap(req_text, job_row.get("vaga_sap"))
+            meta = json.loads(Path("models/thresholds.json").read_text(encoding="utf-8"))
+            thr_default = float(meta.get("mlp_thresholds", {}).get("thr_f1", thr_default))
+        except Exception:
+            pass
 
-            with st.spinner("Gerando recomendações..."):
-                scored = tab2_score_candidates(job_id_tab2, apps_tab2, jobs_tab2, available_candidates)
+        threshold_tab2 = st.slider("Threshold (probabilidade mínima)", 0.0, 1.0, float(thr_default), 0.01)
+        max_results_tab2 = st.slider("Quantidade máxima de candidatos", 10, 200, 50, 10)
 
-            titulo_txt = str(job_row.get("titulo", "")).strip()
-            cliente_txt = str(job_row.get("cliente", "")).strip()
-            st.markdown(f"### Vaga {job_id_tab2}  {titulo_txt} {f'({cliente_txt})' if cliente_txt else ''}")
+        # 3) Pool de candidatos livres
+        available_candidates = apps_tab2.index.difference(prospect_ids_tab2)
+        if available_candidates.empty:
+            st.info("Nenhum candidato livre encontrado.")
+            return
 
-            with st.expander("Requisitos da vaga (CSV/Base)", expanded=True):
-                st.markdown(
-                    f"- Inglês requerido: **{LEVELS[req_ing_ord]}**\n"
-                    f"- Espanhol requerido: **{LEVELS[req_esp_ord]}**\n"
-                    f"- Formação mínima: **{ACADEMICO[req_acad_ord]}**\n"
-                    f"- PCD requerido: **{'Sim' if job_pcd_req == 1 else 'Não'}**\n"
-                    f"- Exige SAP: **{'Sim' if job_sap_req == 1 else 'Não'}**"
-                )
-                st.text_area("Descrição da vaga", value=req_text or "(Sem descrição)", height=160)
+        # 4) Botão de busca (com guards claros)
+        if st.button("Buscar candidatos sugeridos", type="primary"):
+            try:
+                try:
+                    job_row = jobs_tab2.loc[job_id_tab2]
+                except KeyError:
+                    st.error("Vaga selecionada não encontrada na base. Recarregue a página.")
+                    st.stop()
 
-            if scored.empty:
-                st.info("Nenhum candidato elegível para esta vaga.")
-                return
+                # Requisitos extras e parsing
+                req_text = pick_req_text(job_row)
+                req_ing_ord = map_level(job_row.get("nivel_ingles_req"))
+                req_esp_ord = map_level(job_row.get("nivel_espanhol_req"))
+                req_acad_ord = parse_req_acad(req_text)
+                job_pcd_req = parse_req_pcd(req_text)
+                job_sap_req = parse_req_sap(req_text, job_row.get("vaga_sap"))
 
-            filtered_tab2 = scored[scored["probability"] >= threshold_tab2]
-            filtered_tab2 = filtered_tab2.sort_values("probability", ascending=False).head(max_results_tab2)
-            if filtered_tab2.empty:
-                st.info("Nenhum candidato atingiu o corte definido. Ajuste o threshold ou aumente o limite.")
-                return
+                # Scoring
+                with st.spinner("Gerando recomendações..."):
+                    scored = tab2_score_candidates(job_id_tab2, apps_tab2, jobs_tab2, available_candidates)
 
-            rename_map = {
-                "nome": "Candidato",
-                "nivel_ingles": "Inglês",
-                "nível_ingles": "Inglês",
-                "nivel_espanhol": "Espanhol",
-                "nível_espanhol": "Espanhol",
-                "nivel_academico": "Formação",
-                "nível_academico": "Formação",
-                "prob_percent": "Score (%)",
-                "pcd_flag": "PCD",
-                "has_sap": "SAP",
-                "skill_overlap": "Skills match",
-                "token_overlap_ratio": "Token overlap",
-            }
-            table = filtered_tab2.rename(columns=rename_map)
-            display_cols = ["Candidato", "Inglês", "Espanhol", "Formação", "Score (%)", "PCD", "SAP", "Skills match", "Token overlap"]
-            table = table[[c for c in display_cols if c in table.columns]].copy()
-            if "PCD" in table.columns:
-                table["PCD"] = table["PCD"].map({0: "Não", 1: "Sim"})
-            if "SAP" in table.columns:
-                table["SAP"] = table["SAP"].map({0: "Não", 1: "Sim"})
-            if "Token overlap" in table.columns:
-                table["Token overlap"] = (table["Token overlap"] * 100).round(1)
-            if "Score (%)" in table.columns:
-                table = table.round({"Score (%)": 2})
-            st.dataframe(table, width="stretch")
+                # Cabeçalho da vaga com colunas opcionais seguras
+                title_col  = _pick_col(jobs_tab2, ["titulo", "titulo_vaga", "title", "job_title", "vaga", "posição", "position"])
+                client_col = _pick_col(jobs_tab2, ["cliente", "empresa", "company", "cliente_nome"])
+                titulo_txt  = str(job_row.get(title_col, "") if title_col else "").strip()
+                cliente_txt = str(job_row.get(client_col, "") if client_col else "").strip()
+                st.markdown(f"### Vaga {job_id_tab2}  {titulo_txt} {f'({cliente_txt})' if cliente_txt else ''}")
 
-        except Exception as exc:
-            st.error("Falha ao gerar recomendações.")
-            st.exception(exc)
+                with st.expander("Requisitos da vaga (CSV/Base)", expanded=True):
+                    st.markdown(
+                        f"- Inglês requerido: **{LEVELS[req_ing_ord]}**\n"
+                        f"- Espanhol requerido: **{LEVELS[req_esp_ord]}**\n"
+                        f"- Formação mínima: **{ACADEMICO[req_acad_ord]}**\n"
+                        f"- PCD requerido: **{'Sim' if job_pcd_req == 1 else 'Não'}**\n"
+                        f"- Exige SAP: **{'Sim' if job_sap_req == 1 else 'Não'}**"
+                    )
+                    st.text_area("Descrição da vaga", value=req_text or "(Sem descrição)", height=160)
+
+                if scored is None or scored.empty:
+                    st.info("Nenhum candidato elegível para esta vaga.")
+                    return
+
+                # Filtra por threshold e ordena
+                filtered_tab2 = scored[scored["probability"] >= threshold_tab2]
+                filtered_tab2 = filtered_tab2.sort_values("probability", ascending=False).head(max_results_tab2)
+
+                if filtered_tab2.empty:
+                    st.info("Nenhum candidato atingiu o corte definido. Ajuste o threshold ou aumente o limite.")
+                    return
+
+                # Tabela amigável
+                rename_map = {
+                    "nome": "Candidato",
+                    "nivel_ingles": "Inglês",
+                    "nível_ingles": "Inglês",
+                    "nivel_espanhol": "Espanhol",
+                    "nível_espanhol": "Espanhol",
+                    "nivel_academico": "Formação",
+                    "nível_academico": "Formação",
+                    "prob_percent": "Score (%)",
+                    "pcd_flag": "PCD",
+                    "has_sap": "SAP",
+                    "skill_overlap": "Skills match",
+                    "token_overlap_ratio": "Token overlap",
+                }
+                table = filtered_tab2.rename(columns=rename_map)
+                display_cols = ["Candidato", "Inglês", "Espanhol", "Formação", "Score (%)", "PCD", "SAP", "Skills match", "Token overlap"]
+                table = table[[c for c in display_cols if c in table.columns]].copy()
+                if "PCD" in table.columns:
+                    table["PCD"] = table["PCD"].map({0: "Não", 1: "Sim"})
+                if "SAP" in table.columns:
+                    table["SAP"] = table["SAP"].map({0: "Não", 1: "Sim"})
+                if "Token overlap" in table.columns:
+                    table["Token overlap"] = (table["Token overlap"] * 100).round(1)
+                if "Score (%)" in table.columns:
+                    table = table.round({"Score (%)": 2})
+                st.dataframe(table, width="stretch")
+
+            except Exception as exc:
+                st.error("Falha ao gerar recomendações.")
+                st.exception(exc)
+
+    except Exception as exc:
+        st.error("Falha ao renderizar a página.")
+        st.exception(exc)
+        st.stop()
 
 import numpy as np
 
