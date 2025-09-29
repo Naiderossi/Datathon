@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """Training script for MLP + LSA candidate-job matching model."""
 from __future__ import annotations
 
@@ -21,22 +21,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 
-# Pegar credenciais do secrets
-os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
-os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
-
-from kaggle.api.kaggle_api_extended import KaggleApi
-
-# Autenticar
-api = KaggleApi()
-api.authenticate()
-
-# Baixar dataset privado
-api.dataset_download_files(
-    "naiaraderossi/DatathonDataset",
-    path="data",
-    unzip=True
-)
 
 # ---------------------------
 # Baixar dataset privado
@@ -50,6 +34,56 @@ DATASETS_DIR.mkdir(exist_ok=True)
 PATH_APPLICANTS = DATASETS_DIR / "df_applicants.csv"
 PATH_JOBS = DATASETS_DIR / "df_jobs.csv"
 PATH_PROSPECTS = DATASETS_DIR / "df_prospects.csv"
+
+def ensure_dataset(expected_files=None, owner_dataset="naiaraderossi/DatathonDataset", path=DATASETS_DIR):
+    """
+    Garante que os CSVs do dataset existam em `path`.
+    Se não existirem, tenta baixar do Kaggle usando credenciais de env vars ou st.secrets.
+    """
+    from zipfile import ZipFile, is_zipfile
+    path.mkdir(exist_ok=True)
+    if expected_files is None:
+        expected_files = ["df_applicants.csv", "df_jobs.csv", "df_prospects.csv"]
+    if all((path / f).exists() for f in expected_files):
+        return
+
+    try:
+        from kaggle.api.kaggle_api_extended import KaggleApi
+    except Exception as e:
+        raise RuntimeError("Kaggle API não está instalada no ambiente.") from e
+
+    # Tentar credenciais do Streamlit secrets, se houver
+    try:
+        import streamlit as st
+        if "kaggle" in st.secrets:
+            os.environ.setdefault("KAGGLE_USERNAME", st.secrets["kaggle"]["username"])
+            os.environ.setdefault("KAGGLE_KEY", st.secrets["kaggle"]["key"])
+    except Exception:
+        pass
+
+    api = KaggleApi()
+    api.authenticate()
+
+    api.dataset_download_files(owner_dataset, path=str(path), unzip=False)
+    zips = [p for p in path.glob("*.zip")]
+    if not zips:
+        raise RuntimeError("Download do Kaggle não gerou .zip; verifique permissões/slug do dataset.")
+    zip_path = max(zips, key=lambda p: p.stat().st_mtime)
+
+    if not is_zipfile(zip_path):
+        head = zip_path.read_bytes()[:200].decode(errors="ignore")
+        raise RuntimeError(
+            "Arquivo baixado não é ZIP válido (possível falta de permissão ou credenciais inválidas). "
+            f"Prévia do conteúdo: {head}"
+        )
+
+    with ZipFile(zip_path) as z:
+        z.extractall(path)
+    try:
+        zip_path.unlink()
+    except Exception:
+        pass
+
 
 SEED = 42
 np.random.seed(SEED)
@@ -316,7 +350,8 @@ def pick_req_text(row: pd.Series) -> str:
     return " ".join(p for p in parts if isinstance(p, str))
 
 def load_and_prepare() -> pd.DataFrame:
-    apps = pd.read_csvt(PATH_APPLICANTS)
+    ensure_dataset()
+    apps = pd.read_csv(PATH_APPLICANTS)
     jobs = pd.read_csv(PATH_JOBS)
     prospects = pd.read_csv(PATH_PROSPECTS)
 
@@ -541,12 +576,42 @@ except ImportError:
     USE_STREAMLIT_SECRETS = False
 
 def download_pipeline_from_kaggle() -> Path:
-    api.dataset_download_files(
-        "naiaraderossi/DatathonDataset", 
-        path=data_dir,
-        unzip=True
-    )
-    return data_dir / "data_pipeline.joblib"
+    """Baixa pipeline do Kaggle com validação de ZIP."""
+    from zipfile import ZipFile, is_zipfile
+    try:
+        from kaggle.api.kaggle_api_extended import KaggleApi
+    except Exception as e:
+        raise RuntimeError("Kaggle API não está instalada no ambiente.") from e
+
+    try:
+        import streamlit as st
+        if "kaggle" in st.secrets:
+            os.environ.setdefault("KAGGLE_USERNAME", st.secrets["kaggle"]["username"])
+            os.environ.setdefault("KAGGLE_KEY", st.secrets["kaggle"]["key"])
+    except Exception:
+        pass
+
+    api = KaggleApi()
+    api.authenticate()
+
+    DATASETS_DIR.mkdir(exist_ok=True)
+    api.dataset_download_files("naiaraderossi/DatathonDataset", path=str(DATASETS_DIR), unzip=False)
+    zips = list(DATASETS_DIR.glob("*.zip"))
+    if not zips:
+        raise RuntimeError("Download do Kaggle não gerou .zip; verifique permissões.")
+    zip_path = max(zips, key=lambda p: p.stat().st_mtime)
+    if not is_zipfile(zip_path):
+        head = zip_path.read_bytes()[:200].decode(errors="ignore")
+        raise RuntimeError("ZIP inválido ao baixar pipeline. Prévia: " + head)
+
+    with ZipFile(zip_path) as z:
+        z.extractall(DATASETS_DIR)
+    try:
+        zip_path.unlink()
+    except Exception:
+        pass
+
+    return DATASETS_DIR / "data_pipeline.joblib"
 
 def main() -> None:
     df = load_and_prepare()
@@ -628,7 +693,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
 
 
 
