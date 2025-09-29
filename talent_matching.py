@@ -10,6 +10,17 @@ from html import escape
 from ast import literal_eval
 from pathlib import Path
 import io
+
+# ---- UI helpers ----
+
+
+# ---- UI helpers ----
+def segmented_or_radio(label, options, index=0):
+    """Prefer segmented_control; fallback to radio."""
+    if hasattr(st, "segmented_control"):
+        return st.segmented_control(label, options=options, index=index)
+    return st.radio(label, options=options, index=index, horizontal=True)
+
 from src.mlp_infer import NUM_COLS, cosine_01
 
 from train_mlp import pick_cv_text, pick_req_text
@@ -399,19 +410,6 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
 
     def level_label(idx: int, catalog: list[str]) -> str:
         return catalog[idx] if 0 <= idx < len(catalog) else str(idx)
-
-    def segmented_or_radio(label, options, index=0):
-        if hasattr(st, "segmented_control"):
-            try:
-                return st.segmented_control(label=label, options=options, default=options[index])
-            except TypeError:
-                try:
-                    val = st.segmented_control(label=label, options=options)
-                    return val if val is not None else options[index]
-                except Exception:
-                    pass
-        return st.radio(label, options, index=index, horizontal=True)
-
 form = st.form("frm_interview")
 with form:
     c1, c2, c3 = st.columns(3)
@@ -746,7 +744,7 @@ if suggestions_df.empty:
     st.stop()
 
 top_suggestions = suggestions_df.sort_values('Score (%)', ascending=False).head(5)
-st.dataframe(top_suggestions[['job_id', 'Vaga', 'Cliente', 'Score (%)']], use_container_width=True)
+st.dataframe(top_suggestions[['job_id', 'Vaga', 'Cliente', 'Score (%)']], width='stretch')
 
 def _render_sourcing() -> None:
     st.subheader('Sugestão de candidatos livres')
@@ -837,7 +835,7 @@ def _render_sourcing() -> None:
                         table['Token overlap'] = (table['Token overlap'] * 100).round(1)
                     if 'Score (%)' in table.columns:
                         table = table.round({'Score (%)': 2})
-                    st.dataframe(table, use_container_width=True)
+                    st.dataframe(table, width='stretch')
 
                     csv = filtered_tab2.reset_index()[['candidate_id', 'nome', 'email', 'telefone', 'prob_percent'] + NUM_COLS]
                     st.download_button(
