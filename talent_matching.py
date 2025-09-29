@@ -12,6 +12,9 @@ from pathlib import Path
 import io
 
 # ---- UI helpers ----
+
+
+# ---- UI helpers ----
 def segmented_or_radio(label, options, index=0):
     """Prefer segmented_control; fallback to radio."""
     if hasattr(st, "segmented_control"):
@@ -630,6 +633,100 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     
     cards_html: list[str] = []
     
+    ok_ing, status_ing = format_level_status(ing_ord, req_ing_ord)
+    ok_esp, status_esp = format_level_status(esp_ord, req_esp_ord)
+    ok_acad, status_acad = format_level_status(acad_ord, req_acad_ord)
+
+    add_card('Inglês', level_label(ing_ord, levels_display), level_label(req_ing_ord, levels_display), status_ing, ok_ing)
+    add_card('Espanhol', level_label(esp_ord, levels_display), level_label(req_esp_ord, levels_display), status_esp, ok_esp)
+    add_card('Formação', level_label(acad_ord, academico_display), level_label(req_acad_ord, academico_display), status_acad, ok_acad)
+
+    if job_pcd_req == 1:
+        pcd_ok = bool(pcd_flag)
+        pcd_status = 'Critério atendido' if pcd_ok else 'Necessita candidato PCD'
+    else:
+        pcd_ok = True
+        pcd_status = 'Não obrigatório' if not pcd_flag else 'Candidato PCD (diferencial)'
+    add_card('Critério PCD', 'Sim' if pcd_flag else 'Não', 'Sim' if job_pcd_req else 'Não', pcd_status, pcd_ok)
+
+    if job_sap_req == 1:
+        sap_ok = bool(has_sap)
+        sap_status = 'Experiência confirmada' if sap_ok else 'Necessita experiência em SAP'
+    else:
+        sap_ok = True
+        sap_status = 'Não obrigatório' if not has_sap else 'Experiência disponível'
+    add_card('Experiência SAP', 'Sim' if has_sap else 'Não', 'Sim' if job_sap_req else 'Não', sap_status, sap_ok)
+
+    st.markdown(f"<div class='match-grid'>{''.join(cards_html)}</div>", unsafe_allow_html=True)
+
+    if skill_list:
+        skill_pills = ''.join(f"<span class='skill-pill'>{escape(skill)}</span>" for skill in skill_list)
+        st.markdown(
+            f"<div class='skill-section'><span class='skill-title'>Skills considerados na análise</span><div class='skill-pill-container'>{skill_pills}</div></div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption('Nenhum skill informado até o momento.')
+    st.divider()
+    st.subheader('Sugestão de vagas com maior aderência')
+
+    try:
+        _apps, jobs_base, _prospects = tab2_load_base_data()
+    except Exception as exc:
+        st.info(f'Não foi possível carregar a base de vagas para recomendação: {exc}')
+        st.stop()
+
+    suggestions = []
+    job_id_str = str(job_id)
+    for jid, row in jobs_base.iterrows():
+        job_text = pick_req_text(row)
+        if not isinstance(job_text, str) or not job_text.strip():
+            continue
+        req_ing = map_level(row.get('nivel_ingles_req'))
+        req_esp = map_level(row.get('nivel_espanhol_req'))
+        req_acad = parse_req_acad(job_text)
+        job_pcd = parse_req_pcd(job_text)
+        job_sap = parse_req_sap(job_text, row.get('vaga_sap'))
+
+        row_features = artifact.build_feature_row(
+            cv_pt_clean=cv_text,
+            req_text_clean=job_text,
+            ing_ord=ing_ord,
+            esp_ord=esp_ord,
+            acad_ord=acad_ord,
+            req_ing_ord=req_ing,
+            req_esp_ord=req_esp,
+            req_acad_ord=req_acad,
+            pcd_flag=pcd_flag,
+            job_pcd_req=job_pcd,
+            has_sap=has_sap,
+            job_sap_req=job_sap,
+            skills_list=skill_list,
+        )
+        try:
+            score = float(artifact.predict_proba(row_features)) * 100.0
+        except Exception:
+            continue
+        suggestions.append({
+            'job_id': str(jid),
+            'Vaga': row.get('titulo_vaga', ''),
+            'Cliente': row.get('cliente', ''),
+            'Score (%)': round(score, 2),
+        })
+
+    if not suggestions:
+        st.info('Nenhuma outra vaga foi encontrada para recomendação.')
+        st.stop()
+
+    suggestions_df = pd.DataFrame(suggestions)
+    suggestions_df = suggestions_df[suggestions_df['job_id'] != job_id_str]
+    if suggestions_df.empty:
+        st.info('Nenhuma outra vaga atinge score relevante neste momento.')
+        st.stop()
+
+    top_suggestions = suggestions_df.sort_values('Score (%)', ascending=False).head(5)
+    st.dataframe(top_suggestions[['job_id', 'Vaga', 'Cliente', 'Score (%)']], width='stretch')
+
 def add_card(title: str, current: str, requirement: str, status: str, ok: bool) -> None:
     cls = 'ok' if ok else 'warn'
     icon = '✅' if ok else '⚠️'
@@ -649,103 +746,9 @@ def format_level_status(actual_ord: int, req_ord: int) -> tuple[bool, str]:
         return True, f"Acima do requisito (+{diff} {label})"
     if diff == 0:
         return True, 'Dentro do requisito'
-    label = 'nível' if abs(diff) == 1 else 'níveis'
-    return False, f"Abaixo do requisito (-{abs(diff)} {label})"
-
-ok_ing, status_ing = format_level_status(ing_ord, req_ing_ord)
-ok_esp, status_esp = format_level_status(esp_ord, req_esp_ord)
-ok_acad, status_acad = format_level_status(acad_ord, req_acad_ord)
-
-add_card('Inglês', level_label(ing_ord, levels_display), level_label(req_ing_ord, levels_display), status_ing, ok_ing)
-add_card('Espanhol', level_label(esp_ord, levels_display), level_label(req_esp_ord, levels_display), status_esp, ok_esp)
-add_card('Formação', level_label(acad_ord, academico_display), level_label(req_acad_ord, academico_display), status_acad, ok_acad)
-
-if job_pcd_req == 1:
-    pcd_ok = bool(pcd_flag)
-    pcd_status = 'Critério atendido' if pcd_ok else 'Necessita candidato PCD'
-else:
-    pcd_ok = True
-    pcd_status = 'Não obrigatório' if not pcd_flag else 'Candidato PCD (diferencial)'
-add_card('Critério PCD', 'Sim' if pcd_flag else 'Não', 'Sim' if job_pcd_req else 'Não', pcd_status, pcd_ok)
-
-if job_sap_req == 1:
-    sap_ok = bool(has_sap)
-    sap_status = 'Experiência confirmada' if sap_ok else 'Necessita experiência em SAP'
-else:
-    sap_ok = True
-    sap_status = 'Não obrigatório' if not has_sap else 'Experiência disponível'
-add_card('Experiência SAP', 'Sim' if has_sap else 'Não', 'Sim' if job_sap_req else 'Não', sap_status, sap_ok)
-
-st.markdown(f"<div class='match-grid'>{''.join(cards_html)}</div>", unsafe_allow_html=True)
-
-if skill_list:
-    skill_pills = ''.join(f"<span class='skill-pill'>{escape(skill)}</span>" for skill in skill_list)
-    st.markdown(
-        f"<div class='skill-section'><span class='skill-title'>Skills considerados na análise</span><div class='skill-pill-container'>{skill_pills}</div></div>",
-        unsafe_allow_html=True,
-    )
-else:
-    st.caption('Nenhum skill informado até o momento.')
-st.divider()
-st.subheader('Sugestão de vagas com maior aderência')
-
-try:
-    _apps, jobs_base, _prospects = tab2_load_base_data()
-except Exception as exc:
-    st.info(f'Não foi possível carregar a base de vagas para recomendação: {exc}')
-    st.stop()
-
-suggestions = []
-job_id_str = str(job_id)
-for jid, row in jobs_base.iterrows():
-    job_text = pick_req_text(row)
-    if not isinstance(job_text, str) or not job_text.strip():
-        continue
-    req_ing = map_level(row.get('nivel_ingles_req'))
-    req_esp = map_level(row.get('nivel_espanhol_req'))
-    req_acad = parse_req_acad(job_text)
-    job_pcd = parse_req_pcd(job_text)
-    job_sap = parse_req_sap(job_text, row.get('vaga_sap'))
-
-    row_features = artifact.build_feature_row(
-        cv_pt_clean=cv_text,
-        req_text_clean=job_text,
-        ing_ord=ing_ord,
-        esp_ord=esp_ord,
-        acad_ord=acad_ord,
-        req_ing_ord=req_ing,
-        req_esp_ord=req_esp,
-        req_acad_ord=req_acad,
-        pcd_flag=pcd_flag,
-        job_pcd_req=job_pcd,
-        has_sap=has_sap,
-        job_sap_req=job_sap,
-        skills_list=skill_list,
-    )
-    try:
-        score = float(artifact.predict_proba(row_features)) * 100.0
-    except Exception:
-        continue
-    suggestions.append({
-        'job_id': str(jid),
-        'Vaga': row.get('titulo_vaga', ''),
-        'Cliente': row.get('cliente', ''),
-        'Score (%)': round(score, 2),
-    })
-
-if not suggestions:
-    st.info('Nenhuma outra vaga foi encontrada para recomendação.')
-    st.stop()
-
-suggestions_df = pd.DataFrame(suggestions)
-suggestions_df = suggestions_df[suggestions_df['job_id'] != job_id_str]
-if suggestions_df.empty:
-    st.info('Nenhuma outra vaga atinge score relevante neste momento.')
-    st.stop()
-
-top_suggestions = suggestions_df.sort_values('Score (%)', ascending=False).head(5)
-st.dataframe(top_suggestions[['job_id', 'Vaga', 'Cliente', 'Score (%)']], width='stretch')
-
+        label = 'nível' if abs(diff) == 1 else 'níveis'
+        return False, f"Abaixo do requisito (-{abs(diff)} {label})"
+    
 def _render_sourcing() -> None:
     st.subheader('Sugestão de candidatos livres')
     uploaded_jobs_file = st.file_uploader('Upload de novas vagas (CSV opcional)', type='csv', help='O arquivo deve conter ao menos job_id e campos de descrio.')
@@ -1120,8 +1123,6 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
-
-
 
 
 
