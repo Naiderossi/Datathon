@@ -10,23 +10,9 @@ from html import escape
 from ast import literal_eval
 from pathlib import Path
 import io
-
-# ---- UI helpers ----
-
-
-# ---- UI helpers ----
-def segmented_or_radio(label, options, index=0):
-    """Prefer segmented_control; fallback to radio."""
-    if hasattr(st, "segmented_control"):
-        return st.segmented_control(label, options=options, index=index)
-    return st.radio(label, options=options, index=index, horizontal=True)
-
 from src.mlp_infer import NUM_COLS, cosine_01
 
-try:
-    from train_mlp_refactored import pick_cv_text, pick_req_text
-except Exception:
-    from train_mlp import pick_cv_text, pick_req_text
+from train_mlp import pick_cv_text, pick_req_text
 from src.utils import safe_list_parse
 from src.preprocessing import load_applicants, load_jobs
 
@@ -155,7 +141,6 @@ from kaggle.api.kaggle_api_extended import KaggleApi
 KAGGLE_DATASET = "naiaraderossi/DatathonDataset" 
 VAGAS_FILENAME = "vagas.json"
 
-base_dir_default = Path('data')
 # ----------------------------
 # Função para carregar vagas
 # ----------------------------
@@ -414,319 +399,238 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
 
     def level_label(idx: int, catalog: list[str]) -> str:
         return catalog[idx] if 0 <= idx < len(catalog) else str(idx)
-    form = st.form("frm_interview")
-    with form:
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            nome = st.text_input("Nome *")
-            email = st.text_input("E-mail *")
-            cidade = st.text_input("Cidade/UF")
-        with c2:
-            nivel_ingles = segmented_or_radio("Nível de inglês", levels_display, index=2)
-            nivel_espanhol = segmented_or_radio("Nível de espanhol", levels_display, index=0)
-        with c3:
-            nivel_acad = segmented_or_radio("Nível acadêmico", academico_display, index=4)
-            pcd_flag_ui = segmented_or_radio("PCD", ["Não", "Sim"], index=0)
-    
-        st.caption("Skills (tags - digite para filtrar)")
-        skills = st.multiselect(
-            "Selecionar skills",
-            options=DEFAULT_SKILLS,
-            default=[],
-            placeholder="Ex.: SAP, MM, Python...",
-        )
-        skills_extra = st.text_input("Skills extras (vírgulas)")
-    
-        suggested_skills = extract_req_skills(req_text_clean)
-        if suggested_skills:
-            competencias_sugeridas = st.multiselect(
-                "Competências sugeridas pela vaga",
-                options=suggested_skills,
-                default=suggested_skills,
-                help="Selecione as competências relevantes para preencher o skill list do candidato.",
-            )
-        else:
-            competencias_sugeridas = []
-            st.caption("Nenhuma competência sugerida automaticamente para esta vaga.")
-    
-        st.caption("Quesitos comportamentais desejados")
-        behavioral_suggestions = extract_req_behaviors(req_text_clean)
-        comportamento_opcoes = (
-            behavioral_suggestions if behavioral_suggestions else DEFAULT_BEHAVIORAL_TRAITS
-        )
-        comportamentos_escolhidos = st.multiselect(
-            "Competências comportamentais",
-            options=comportamento_opcoes,
-            default=behavioral_suggestions,
-            help="Selecione atributos comportamentais alinhados ao perfil da vaga.",
-        )
-        comportamentos_extra = st.text_input("Outros quesitos comportamentais (vírgulas)")
-    
-        comportamentos_registrados = set(comportamentos_escolhidos)
-        if comportamentos_extra:
-            comportamentos_registrados.update(
-                {item.strip() for item in comportamentos_extra.split(",") if item.strip()}
-            )
-        st.session_state["form_comportamentos"] = sorted(comportamentos_registrados)
-    
-        st.caption("Resumo do CV (texto livre - pode colar trechos do currículo)")
-        cv_text = st.text_area(
-            "CV (texto livre)",
-            height=160,
-            placeholder="Cole aqui um resumo do currículo ou os tópicos principais",
-        )
-    
-        submitted = form.form_submit_button("Analisar candidato!")
-    
-    # 🔹 A validação só roda se o form foi submetido
-    if not submitted:
-        st.stop()
-    
-    missing = []
-    if not nome.strip():
-        missing.append('nome')
-    if not email.strip():
-        missing.append('e-mail')
-    if not cv_text.strip():
-        missing.append('currículo (texto livre)')
-    
-    if missing:
-        st.warning('Preencha os campos obrigatórios: ' + ', '.join(missing))
-        st.stop()
-    
-    if not HAS_MLP:
-        st.error('Modelo MLP não disponível. Garanta que os artefatos estejam na pasta `models/`.')
-        st.stop()
-    
-    try:
-        artifact = tab2_get_artifact()
-    except FileNotFoundError as exc:
-        st.error(f'Artefato do modelo não encontrado: {exc}')
-        st.stop()
-    except Exception as exc:
-        st.error(f'Não foi possível carregar o modelo: {exc}')
-        st.stop()
-    
-    extras = [item.strip() for item in skills_extra.split(',') if item.strip()]
-    combined_skills = skills + competencias_sugeridas + extras
-    skill_list: list[str] = []
-    for item in combined_skills:
-        if item and item not in skill_list:
-            skill_list.append(item)
-    
-    ing_ord = map_level(nivel_ingles)
-    esp_ord = map_level(nivel_espanhol)
-    acad_ord = map_acad(nivel_acad)
-    pcd_flag = 1 if pcd_flag_ui.lower().startswith('s') else 0
-    has_sap = detect_sap_tab2(skill_list, '', cv_text)
-    
-    req_ing_ord = int(job_row.get('req_ing_ord', parse_req_lang(req_text_clean, 'ingles')))
-    req_esp_ord = int(job_row.get('req_esp_ord', parse_req_lang(req_text_clean, 'espanhol')))
-    req_acad_ord = int(job_row.get('req_acad_ord', parse_req_acad(req_text_clean)))
-    job_pcd_req = int(job_row.get('job_pcd_req', parse_req_pcd(req_text_clean)))
-    job_sap_req = int(job_row.get('job_sap_req', parse_req_sap(req_text_clean, job_row.get('vaga_sap_raw') or job_row.get('vaga_sap'))))
-    
-    feature_row = artifact.build_feature_row(
-        cv_pt_clean=cv_text,
-        req_text_clean=req_text_clean,
-        ing_ord=ing_ord,
-        esp_ord=esp_ord,
-        acad_ord=acad_ord,
-        req_ing_ord=req_ing_ord,
-        req_esp_ord=req_esp_ord,
-        req_acad_ord=req_acad_ord,
-        pcd_flag=pcd_flag,
-        job_pcd_req=job_pcd_req,
-        has_sap=has_sap,
-        job_sap_req=job_sap_req,
-        skills_list=skill_list,
+
+    def segmented_or_radio(label, options, index=0):
+        if hasattr(st, "segmented_control"):
+            try:
+                return st.segmented_control(label=label, options=options, default=options[index])
+            except TypeError:
+                try:
+                    val = st.segmented_control(label=label, options=options)
+                    return val if val is not None else options[index]
+                except Exception:
+                    pass
+        return st.radio(label, options, index=index, horizontal=True)
+
+form = st.form("frm_interview")
+with form:
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        nome = st.text_input("Nome *")
+        email = st.text_input("E-mail *")
+        cidade = st.text_input("Cidade/UF")
+    with c2:
+        nivel_ingles = segmented_or_radio("Nível de inglês", levels_display, index=2)
+        nivel_espanhol = segmented_or_radio("Nível de espanhol", levels_display, index=0)
+    with c3:
+        nivel_acad = segmented_or_radio("Nível acadêmico", academico_display, index=4)
+        pcd_flag_ui = segmented_or_radio("PCD", ["Não", "Sim"], index=0)
+
+    st.caption("Skills (tags - digite para filtrar)")
+    skills = st.multiselect(
+        "Selecionar skills",
+        options=DEFAULT_SKILLS,
+        default=[],
+        placeholder="Ex.: SAP, MM, Python...",
     )
-    
-    try:
-        probability = float(artifact.predict_proba(feature_row))
-    except Exception as exc:
-        st.error(f'Erro na inferência do MLP: {exc}')
-        st.stop()
-    
-    score_percent = probability * 100.0
-    st.success(f'Aderência estimada para a vaga {job_id}: {score_percent:.1f}%')
-    
-    st.markdown(
-        """
-        <style>
-            .match-grid {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 1rem;
-                margin: 1rem 0 0 0;
-            }
-            .match-card {
-                flex: 1 1 220px;
-                border-radius: 14px;
-                border: 1px solid #e8eef9;
-                padding: 1rem 1.2rem;
-                background: #f9fbff;
-                box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
-            }
-            .match-card.ok {
-                border-color: #a7f3d0;
-                background: #f1fdf6;
-            }
-            .match-card.warn {
-                border-color: #fecaca;
-                background: #fff6f5;
-            }
-            .match-card .match-label {
-                text-transform: uppercase;
-                font-size: 0.75rem;
-                letter-spacing: 0.08em;
-                color: #64748b;
-                margin-bottom: 0.35rem;
-            }
-            .match-card .match-value {
-                font-size: 1.55rem;
-                font-weight: 600;
-                color: #0f172a;
-                margin-bottom: 0.35rem;
-            }
-            .match-card .match-req {
-                font-size: 0.85rem;
-                color: #475569;
-            }
-            .match-card .match-status {
-                font-size: 0.9rem;
-                font-weight: 600;
-                margin-top: 0.4rem;
-            }
-            .match-card.ok .match-status {
-                color: #047857;
-            }
-            .match-card.warn .match-status {
-                color: #b91c1c;
-            }
-            .skill-section {
-                margin-top: 1.2rem;
-            }
-            .skill-title {
-                font-size: 0.9rem;
-                font-weight: 600;
-                color: #334155;
-                margin-bottom: 0.4rem;
-                display: inline-block;
-            }
-            .skill-pill-container {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.5rem;
-            }
-            .skill-pill {
-                padding: 0.35rem 0.75rem;
-                border-radius: 999px;
-                background: #eef2ff;
-                color: #3730a3;
-                font-size: 0.85rem;
-                font-weight: 500;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
+    skills_extra = st.text_input("Skills extras (vírgulas)")
+
+    suggested_skills = extract_req_skills(req_text_clean)
+    if suggested_skills:
+        competencias_sugeridas = st.multiselect(
+            "Competências sugeridas pela vaga",
+            options=suggested_skills,
+            default=suggested_skills,
+            help="Selecione as competências relevantes para preencher o skill list do candidato.",
+        )
+    else:
+        competencias_sugeridas = []
+        st.caption("Nenhuma competência sugerida automaticamente para esta vaga.")
+
+    st.caption("Quesitos comportamentais desejados")
+    behavioral_suggestions = extract_req_behaviors(req_text_clean)
+    comportamento_opcoes = (
+        behavioral_suggestions if behavioral_suggestions else DEFAULT_BEHAVIORAL_TRAITS
     )
-    
-    cards_html: list[str] = []
-    
-    ok_ing, status_ing = format_level_status(ing_ord, req_ing_ord)
-    ok_esp, status_esp = format_level_status(esp_ord, req_esp_ord)
-    ok_acad, status_acad = format_level_status(acad_ord, req_acad_ord)
+    comportamentos_escolhidos = st.multiselect(
+        "Competências comportamentais",
+        options=comportamento_opcoes,
+        default=behavioral_suggestions,
+        help="Selecione atributos comportamentais alinhados ao perfil da vaga.",
+    )
+    comportamentos_extra = st.text_input("Outros quesitos comportamentais (vírgulas)")
 
-    add_card('Inglês', level_label(ing_ord, levels_display), level_label(req_ing_ord, levels_display), status_ing, ok_ing)
-    add_card('Espanhol', level_label(esp_ord, levels_display), level_label(req_esp_ord, levels_display), status_esp, ok_esp)
-    add_card('Formação', level_label(acad_ord, academico_display), level_label(req_acad_ord, academico_display), status_acad, ok_acad)
-
-    if job_pcd_req == 1:
-        pcd_ok = bool(pcd_flag)
-        pcd_status = 'Critério atendido' if pcd_ok else 'Necessita candidato PCD'
-    else:
-        pcd_ok = True
-        pcd_status = 'Não obrigatório' if not pcd_flag else 'Candidato PCD (diferencial)'
-    add_card('Critério PCD', 'Sim' if pcd_flag else 'Não', 'Sim' if job_pcd_req else 'Não', pcd_status, pcd_ok)
-
-    if job_sap_req == 1:
-        sap_ok = bool(has_sap)
-        sap_status = 'Experiência confirmada' if sap_ok else 'Necessita experiência em SAP'
-    else:
-        sap_ok = True
-        sap_status = 'Não obrigatório' if not has_sap else 'Experiência disponível'
-    add_card('Experiência SAP', 'Sim' if has_sap else 'Não', 'Sim' if job_sap_req else 'Não', sap_status, sap_ok)
-
-    st.markdown(f"<div class='match-grid'>{''.join(cards_html)}</div>", unsafe_allow_html=True)
-
-    if skill_list:
-        skill_pills = ''.join(f"<span class='skill-pill'>{escape(skill)}</span>" for skill in skill_list)
-        st.markdown(
-            f"<div class='skill-section'><span class='skill-title'>Skills considerados na análise</span><div class='skill-pill-container'>{skill_pills}</div></div>",
-            unsafe_allow_html=True,
+    comportamentos_registrados = set(comportamentos_escolhidos)
+    if comportamentos_extra:
+        comportamentos_registrados.update(
+            {item.strip() for item in comportamentos_extra.split(",") if item.strip()}
         )
-    else:
-        st.caption('Nenhum skill informado até o momento.')
-    st.divider()
-    st.subheader('Sugestão de vagas com maior aderência')
+    st.session_state["form_comportamentos"] = sorted(comportamentos_registrados)
 
-    try:
-        _apps, jobs_base, _prospects = tab2_load_base_data()
-    except Exception as exc:
-        st.info(f'Não foi possível carregar a base de vagas para recomendação: {exc}')
-        st.stop()
+    st.caption("Resumo do CV (texto livre - pode colar trechos do currículo)")
+    cv_text = st.text_area(
+        "CV (texto livre)",
+        height=160,
+        placeholder="Cole aqui um resumo do currículo ou os tópicos principais",
+    )
 
-    suggestions = []
-    job_id_str = str(job_id)
-    for jid, row in jobs_base.iterrows():
-        job_text = pick_req_text(row)
-        if not isinstance(job_text, str) or not job_text.strip():
-            continue
-        req_ing = map_level(row.get('nivel_ingles_req'))
-        req_esp = map_level(row.get('nivel_espanhol_req'))
-        req_acad = parse_req_acad(job_text)
-        job_pcd = parse_req_pcd(job_text)
-        job_sap = parse_req_sap(job_text, row.get('vaga_sap'))
+    submitted = form.form_submit_button("Analisar candidato!")
 
-        row_features = artifact.build_feature_row(
-            cv_pt_clean=cv_text,
-            req_text_clean=job_text,
-            ing_ord=ing_ord,
-            esp_ord=esp_ord,
-            acad_ord=acad_ord,
-            req_ing_ord=req_ing,
-            req_esp_ord=req_esp,
-            req_acad_ord=req_acad,
-            pcd_flag=pcd_flag,
-            job_pcd_req=job_pcd,
-            has_sap=has_sap,
-            job_sap_req=job_sap,
-            skills_list=skill_list,
-        )
-        try:
-            score = float(artifact.predict_proba(row_features)) * 100.0
-        except Exception:
-            continue
-        suggestions.append({
-            'job_id': str(jid),
-            'Vaga': row.get('titulo_vaga', ''),
-            'Cliente': row.get('cliente', ''),
-            'Score (%)': round(score, 2),
-        })
+# 🔹 A validação só roda se o form foi submetido
+if not submitted:
+    st.stop()
 
-    if not suggestions:
-        st.info('Nenhuma outra vaga foi encontrada para recomendação.')
-        st.stop()
+missing = []
+if not nome.strip():
+    missing.append('nome')
+if not email.strip():
+    missing.append('e-mail')
+if not cv_text.strip():
+    missing.append('currículo (texto livre)')
 
-    suggestions_df = pd.DataFrame(suggestions)
-    suggestions_df = suggestions_df[suggestions_df['job_id'] != job_id_str]
-    if suggestions_df.empty:
-        st.info('Nenhuma outra vaga atinge score relevante neste momento.')
-        st.stop()
+if missing:
+    st.warning('Preencha os campos obrigatórios: ' + ', '.join(missing))
+    st.stop()
 
-    top_suggestions = suggestions_df.sort_values('Score (%)', ascending=False).head(5)
-    st.dataframe(top_suggestions[['job_id', 'Vaga', 'Cliente', 'Score (%)']], width='stretch')
+if not HAS_MLP:
+    st.error('Modelo MLP não disponível. Garanta que os artefatos estejam na pasta `models/`.')
+    st.stop()
+
+try:
+    artifact = tab2_get_artifact()
+except FileNotFoundError as exc:
+    st.error(f'Artefato do modelo não encontrado: {exc}')
+    st.stop()
+except Exception as exc:
+    st.error(f'Não foi possível carregar o modelo: {exc}')
+    st.stop()
+
+extras = [item.strip() for item in skills_extra.split(',') if item.strip()]
+combined_skills = skills + competencias_sugeridas + extras
+skill_list: list[str] = []
+for item in combined_skills:
+    if item and item not in skill_list:
+        skill_list.append(item)
+
+ing_ord = map_level(nivel_ingles)
+esp_ord = map_level(nivel_espanhol)
+acad_ord = map_acad(nivel_acad)
+pcd_flag = 1 if pcd_flag_ui.lower().startswith('s') else 0
+has_sap = detect_sap_tab2(skill_list, '', cv_text)
+
+req_ing_ord = int(job_row.get('req_ing_ord', parse_req_lang(req_text_clean, 'ingles')))
+req_esp_ord = int(job_row.get('req_esp_ord', parse_req_lang(req_text_clean, 'espanhol')))
+req_acad_ord = int(job_row.get('req_acad_ord', parse_req_acad(req_text_clean)))
+job_pcd_req = int(job_row.get('job_pcd_req', parse_req_pcd(req_text_clean)))
+job_sap_req = int(job_row.get('job_sap_req', parse_req_sap(req_text_clean, job_row.get('vaga_sap_raw') or job_row.get('vaga_sap'))))
+
+feature_row = artifact.build_feature_row(
+    cv_pt_clean=cv_text,
+    req_text_clean=req_text_clean,
+    ing_ord=ing_ord,
+    esp_ord=esp_ord,
+    acad_ord=acad_ord,
+    req_ing_ord=req_ing_ord,
+    req_esp_ord=req_esp_ord,
+    req_acad_ord=req_acad_ord,
+    pcd_flag=pcd_flag,
+    job_pcd_req=job_pcd_req,
+    has_sap=has_sap,
+    job_sap_req=job_sap_req,
+    skills_list=skill_list,
+)
+
+try:
+    probability = float(artifact.predict_proba(feature_row))
+except Exception as exc:
+    st.error(f'Erro na inferência do MLP: {exc}')
+    st.stop()
+
+score_percent = probability * 100.0
+st.success(f'Aderência estimada para a vaga {job_id}: {score_percent:.1f}%')
+
+st.markdown(
+    """
+    <style>
+        .match-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 1rem 0 0 0;
+        }
+        .match-card {
+            flex: 1 1 220px;
+            border-radius: 14px;
+            border: 1px solid #e8eef9;
+            padding: 1rem 1.2rem;
+            background: #f9fbff;
+            box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+        }
+        .match-card.ok {
+            border-color: #a7f3d0;
+            background: #f1fdf6;
+        }
+        .match-card.warn {
+            border-color: #fecaca;
+            background: #fff6f5;
+        }
+        .match-card .match-label {
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            color: #64748b;
+            margin-bottom: 0.35rem;
+        }
+        .match-card .match-value {
+            font-size: 1.55rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 0.35rem;
+        }
+        .match-card .match-req {
+            font-size: 0.85rem;
+            color: #475569;
+        }
+        .match-card .match-status {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-top: 0.4rem;
+        }
+        .match-card.ok .match-status {
+            color: #047857;
+        }
+        .match-card.warn .match-status {
+            color: #b91c1c;
+        }
+        .skill-section {
+            margin-top: 1.2rem;
+        }
+        .skill-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 0.4rem;
+            display: inline-block;
+        }
+        .skill-pill-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .skill-pill {
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #3730a3;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+cards_html: list[str] = []
 
 def add_card(title: str, current: str, requirement: str, status: str, ok: bool) -> None:
     cls = 'ok' if ok else 'warn'
@@ -747,9 +651,103 @@ def format_level_status(actual_ord: int, req_ord: int) -> tuple[bool, str]:
         return True, f"Acima do requisito (+{diff} {label})"
     if diff == 0:
         return True, 'Dentro do requisito'
-        label = 'nível' if abs(diff) == 1 else 'níveis'
-        return False, f"Abaixo do requisito (-{abs(diff)} {label})"
-    
+    label = 'nível' if abs(diff) == 1 else 'níveis'
+    return False, f"Abaixo do requisito (-{abs(diff)} {label})"
+
+ok_ing, status_ing = format_level_status(ing_ord, req_ing_ord)
+ok_esp, status_esp = format_level_status(esp_ord, req_esp_ord)
+ok_acad, status_acad = format_level_status(acad_ord, req_acad_ord)
+
+add_card('Inglês', level_label(ing_ord, levels_display), level_label(req_ing_ord, levels_display), status_ing, ok_ing)
+add_card('Espanhol', level_label(esp_ord, levels_display), level_label(req_esp_ord, levels_display), status_esp, ok_esp)
+add_card('Formação', level_label(acad_ord, academico_display), level_label(req_acad_ord, academico_display), status_acad, ok_acad)
+
+if job_pcd_req == 1:
+    pcd_ok = bool(pcd_flag)
+    pcd_status = 'Critério atendido' if pcd_ok else 'Necessita candidato PCD'
+else:
+    pcd_ok = True
+    pcd_status = 'Não obrigatório' if not pcd_flag else 'Candidato PCD (diferencial)'
+add_card('Critério PCD', 'Sim' if pcd_flag else 'Não', 'Sim' if job_pcd_req else 'Não', pcd_status, pcd_ok)
+
+if job_sap_req == 1:
+    sap_ok = bool(has_sap)
+    sap_status = 'Experiência confirmada' if sap_ok else 'Necessita experiência em SAP'
+else:
+    sap_ok = True
+    sap_status = 'Não obrigatório' if not has_sap else 'Experiência disponível'
+add_card('Experiência SAP', 'Sim' if has_sap else 'Não', 'Sim' if job_sap_req else 'Não', sap_status, sap_ok)
+
+st.markdown(f"<div class='match-grid'>{''.join(cards_html)}</div>", unsafe_allow_html=True)
+
+if skill_list:
+    skill_pills = ''.join(f"<span class='skill-pill'>{escape(skill)}</span>" for skill in skill_list)
+    st.markdown(
+        f"<div class='skill-section'><span class='skill-title'>Skills considerados na análise</span><div class='skill-pill-container'>{skill_pills}</div></div>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.caption('Nenhum skill informado até o momento.')
+st.divider()
+st.subheader('Sugestão de vagas com maior aderência')
+
+try:
+    _apps, jobs_base, _prospects = tab2_load_base_data()
+except Exception as exc:
+    st.info(f'Não foi possível carregar a base de vagas para recomendação: {exc}')
+    st.stop()
+
+suggestions = []
+job_id_str = str(job_id)
+for jid, row in jobs_base.iterrows():
+    job_text = pick_req_text(row)
+    if not isinstance(job_text, str) or not job_text.strip():
+        continue
+    req_ing = map_level(row.get('nivel_ingles_req'))
+    req_esp = map_level(row.get('nivel_espanhol_req'))
+    req_acad = parse_req_acad(job_text)
+    job_pcd = parse_req_pcd(job_text)
+    job_sap = parse_req_sap(job_text, row.get('vaga_sap'))
+
+    row_features = artifact.build_feature_row(
+        cv_pt_clean=cv_text,
+        req_text_clean=job_text,
+        ing_ord=ing_ord,
+        esp_ord=esp_ord,
+        acad_ord=acad_ord,
+        req_ing_ord=req_ing,
+        req_esp_ord=req_esp,
+        req_acad_ord=req_acad,
+        pcd_flag=pcd_flag,
+        job_pcd_req=job_pcd,
+        has_sap=has_sap,
+        job_sap_req=job_sap,
+        skills_list=skill_list,
+    )
+    try:
+        score = float(artifact.predict_proba(row_features)) * 100.0
+    except Exception:
+        continue
+    suggestions.append({
+        'job_id': str(jid),
+        'Vaga': row.get('titulo_vaga', ''),
+        'Cliente': row.get('cliente', ''),
+        'Score (%)': round(score, 2),
+    })
+
+if not suggestions:
+    st.info('Nenhuma outra vaga foi encontrada para recomendação.')
+    st.stop()
+
+suggestions_df = pd.DataFrame(suggestions)
+suggestions_df = suggestions_df[suggestions_df['job_id'] != job_id_str]
+if suggestions_df.empty:
+    st.info('Nenhuma outra vaga atinge score relevante neste momento.')
+    st.stop()
+
+top_suggestions = suggestions_df.sort_values('Score (%)', ascending=False).head(5)
+st.dataframe(top_suggestions[['job_id', 'Vaga', 'Cliente', 'Score (%)']], use_container_width=True)
+
 def _render_sourcing() -> None:
     st.subheader('Sugestão de candidatos livres')
     uploaded_jobs_file = st.file_uploader('Upload de novas vagas (CSV opcional)', type='csv', help='O arquivo deve conter ao menos job_id e campos de descrio.')
@@ -839,7 +837,7 @@ def _render_sourcing() -> None:
                         table['Token overlap'] = (table['Token overlap'] * 100).round(1)
                     if 'Score (%)' in table.columns:
                         table = table.round({'Score (%)': 2})
-                    st.dataframe(table, width='stretch')
+                    st.dataframe(table, use_container_width=True)
 
                     csv = filtered_tab2.reset_index()[['candidate_id', 'nome', 'email', 'telefone', 'prob_percent'] + NUM_COLS]
                     st.download_button(
@@ -1124,6 +1122,10 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
+
+
+
 
 
 
