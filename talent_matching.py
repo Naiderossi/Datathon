@@ -388,6 +388,7 @@ def extract_req_skills(req_text: str) -> list[str]:
 # -------------------------
 
 def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
+    """Renderiza o formulário padronizado de entrevista e exibe análises/sugestões."""
     st.subheader("Formulário de entrevista (padronizado)")
 
     levels_display = [
@@ -412,6 +413,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     def level_label(idx: int, catalog: list[str]) -> str:
         return catalog[idx] if 0 <= idx < len(catalog) else str(idx)
 
+    # Início do formulário: todos os widgets ficam dentro do with form
     form = st.form("frm_interview")
     with form:
         c1, c2, c3 = st.columns(3)
@@ -474,38 +476,39 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
             placeholder="Cole aqui um resumo do currículo ou os tópicos principais",
         )
 
+        # Botão de submissão do formulário
         submitted = form.form_submit_button("Analisar candidato!")
 
-        # 🔹 A validação só roda se o form foi submetido
+    # Fora do with form, mas ainda dentro da função: trata submissão e analisa dados
     if not submitted:
         st.stop()
 
     missing = []
     if not nome.strip():
-        missing.append('nome')
+        missing.append("nome")
     if not email.strip():
-        missing.append('e-mail')
+        missing.append("e-mail")
     if not cv_text.strip():
-        missing.append('currículo (texto livre)')
+        missing.append("currículo (texto livre)")
 
     if missing:
-        st.warning('Preencha os campos obrigatórios: ' + ', '.join(missing))
+        st.warning("Preencha os campos obrigatórios: " + ", ".join(missing))
         st.stop()
 
     if not HAS_MLP:
-        st.error('Modelo MLP não disponível. Garanta que os artefatos estejam na pasta `models/`.')
+        st.error("Modelo MLP não disponível. Garanta que os artefatos estejam na pasta `models/`.")
         st.stop()
 
     try:
         artifact = tab2_get_artifact()
     except FileNotFoundError as exc:
-        st.error(f'Artefato do modelo não encontrado: {exc}')
+        st.error(f"Artefato do modelo não encontrado: {exc}")
         st.stop()
     except Exception as exc:
-        st.error(f'Não foi possível carregar o modelo: {exc}')
+        st.error(f"Não foi possível carregar o modelo: {exc}")
         st.stop()
 
-    extras = [item.strip() for item in skills_extra.split(',') if item.strip()]
+    extras = [item.strip() for item in skills_extra.split(",") if item.strip()]
     combined_skills = skills + competencias_sugeridas + extras
     skill_list: list[str] = []
     for item in combined_skills:
@@ -515,14 +518,18 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     ing_ord = map_level(nivel_ingles)
     esp_ord = map_level(nivel_espanhol)
     acad_ord = map_acad(nivel_acad)
-    pcd_flag = 1 if pcd_flag_ui.lower().startswith('s') else 0
-    has_sap = detect_sap_tab2(skill_list, '', cv_text)
+    pcd_flag = 1 if pcd_flag_ui.lower().startswith("s") else 0
+    has_sap = detect_sap_tab2(skill_list, "", cv_text)
 
-    req_ing_ord = int(job_row.get('req_ing_ord', parse_req_lang(req_text_clean, 'ingles')))
-    req_esp_ord = int(job_row.get('req_esp_ord', parse_req_lang(req_text_clean, 'espanhol')))
-    req_acad_ord = int(job_row.get('req_acad_ord', parse_req_acad(req_text_clean)))
-    job_pcd_req = int(job_row.get('job_pcd_req', parse_req_pcd(req_text_clean)))
-    job_sap_req = int(job_row.get('job_sap_req', parse_req_sap(req_text_clean, job_row.get('vaga_sap_raw') or job_row.get('vaga_sap'))))
+    req_ing_ord = int(job_row.get("req_ing_ord", parse_req_lang(req_text_clean, "ingles")))
+    req_esp_ord = int(job_row.get("req_esp_ord", parse_req_lang(req_text_clean, "espanhol")))
+    req_acad_ord = int(job_row.get("req_acad_ord", parse_req_acad(req_text_clean)))
+    job_pcd_req = int(
+        job_row.get("job_pcd_req", parse_req_pcd(req_text_clean))
+    )
+    job_sap_req = int(
+        job_row.get("job_sap_req", parse_req_sap(req_text_clean, job_row.get("vaga_sap_raw") or job_row.get("vaga_sap")))
+    )
 
     feature_row = artifact.build_feature_row(
         cv_pt_clean=cv_text,
@@ -543,12 +550,13 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     try:
         probability = float(artifact.predict_proba(feature_row))
     except Exception as exc:
-        st.error(f'Erro na inferência do MLP: {exc}')
+        st.error(f"Erro na inferência do MLP: {exc}")
         st.stop()
 
     score_percent = probability * 100.0
-    st.success(f'Aderência estimada para a vaga {job_id}: {score_percent:.1f}%')
+    st.success(f"Aderência estimada para a vaga {job_id}: {score_percent:.1f}%")
 
+    # Estilos para os cards de aderência
     st.markdown(
         """
         <style>
@@ -630,123 +638,101 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
         unsafe_allow_html=True,
     )
 
+    # Monta os cartões de aderência
     cards_html: list[str] = []
+    ok_ing, status_ing = format_level_status(ing_ord, req_ing_ord)
+    ok_esp, status_esp = format_level_status(esp_ord, req_esp_ord)
+    ok_acad, status_acad = format_level_status(acad_ord, req_acad_ord)
 
-def add_card(title: str, current: str, requirement: str, status: str, ok: bool) -> None:
-    cls = 'ok' if ok else 'warn'
-    icon = '✅' if ok else '⚠️'
-    cards_html.append(
-        f"<div class='match-card {cls}'>"
-        f"<div class='match-label'>{escape(title)}</div>"
-        f"<div class='match-value'>{icon} {escape(current)}</div>"
-        f"<div class='match-req'>Requisito: {escape(requirement)}</div>"
-        f"<div class='match-status'>{escape(status)}</div>"
-        "</div>"
+    add_card(
+        "Inglês",
+        level_label(ing_ord, levels_display),
+        level_label(req_ing_ord, levels_display),
+        status_ing,
+        ok_ing,
+    )
+    add_card(
+        "Espanhol",
+        level_label(esp_ord, levels_display),
+        level_label(req_esp_ord, levels_display),
+        status_esp,
+        ok_esp,
+    )
+    add_card(
+        "Formação",
+        level_label(acad_ord, academico_display),
+        level_label(req_acad_ord, academico_display),
+        status_acad,
+        ok_acad,
     )
 
-def format_level_status(actual_ord: int, req_ord: int) -> tuple[bool, str]:
-    diff = actual_ord - req_ord
-    if diff > 0:
-        label = 'nível' if diff == 1 else 'níveis'
-        return True, f"Acima do requisito (+{diff} {label})"
-    if diff == 0:
-        return True, 'Dentro do requisito'
-    label = 'nível' if abs(diff) == 1 else 'níveis'
-    return False, f"Abaixo do requisito (-{abs(diff)} {label})"
-
-ok_ing, status_ing = format_level_status(ing_ord, req_ing_ord)
-ok_esp, status_esp = format_level_status(esp_ord, req_esp_ord)
-ok_acad, status_acad = format_level_status(acad_ord, req_acad_ord)
-
-add_card('Inglês', level_label(ing_ord, levels_display), level_label(req_ing_ord, levels_display), status_ing, ok_ing)
-add_card('Espanhol', level_label(esp_ord, levels_display), level_label(req_esp_ord, levels_display), status_esp, ok_esp)
-add_card('Formação', level_label(acad_ord, academico_display), level_label(req_acad_ord, academico_display), status_acad, ok_acad)
-
-if job_pcd_req == 1:
-    pcd_ok = bool(pcd_flag)
-    pcd_status = 'Critério atendido' if pcd_ok else 'Necessita candidato PCD'
-else:
-    pcd_ok = True
-    pcd_status = 'Não obrigatório' if not pcd_flag else 'Candidato PCD (diferencial)'
-add_card('Critério PCD', 'Sim' if pcd_flag else 'Não', 'Sim' if job_pcd_req else 'Não', pcd_status, pcd_ok)
-
-if job_sap_req == 1:
-    sap_ok = bool(has_sap)
-    sap_status = 'Experiência confirmada' if sap_ok else 'Necessita experiência em SAP'
-else:
-    sap_ok = True
-    sap_status = 'Não obrigatório' if not has_sap else 'Experiência disponível'
-add_card('Experiência SAP', 'Sim' if has_sap else 'Não', 'Sim' if job_sap_req else 'Não', sap_status, sap_ok)
-
-st.markdown(f"<div class='match-grid'>{''.join(cards_html)}</div>", unsafe_allow_html=True)
-
-if skill_list:
-    skill_pills = ''.join(f"<span class='skill-pill'>{escape(skill)}</span>" for skill in skill_list)
-    st.markdown(
-        f"<div class='skill-section'><span class='skill-title'>Skills considerados na análise</span><div class='skill-pill-container'>{skill_pills}</div></div>",
-        unsafe_allow_html=True,
+    # Critério PCD
+    if job_pcd_req == 1:
+        pcd_ok = bool(pcd_flag)
+        pcd_status = "Critério atendido" if pcd_ok else "Necessita candidato PCD"
+    else:
+        pcd_ok = True
+        pcd_status = "Não obrigatório" if not pcd_flag else "Candidato PCD (diferencial)"
+    add_card(
+        "Critério PCD",
+        "Sim" if pcd_flag else "Não",
+        "Sim" if job_pcd_req else "Não",
+        pcd_status,
+        pcd_ok,
     )
-else:
-    st.caption('Nenhum skill informado até o momento.')
-st.divider()
-st.subheader('Sugestão de vagas com maior aderência')
 
-try:
-    _apps, jobs_base, _prospects = tab2_load_base_data()
-except Exception as exc:
-    st.info(f'Não foi possível carregar a base de vagas para recomendação: {exc}')
-    st.stop()
-
-suggestions = []
-job_id_str = str(job_id)
-for jid, row in jobs_base.iterrows():
-    job_text = pick_req_text(row)
-    if not isinstance(job_text, str) or not job_text.strip():
-        continue
-    req_ing = map_level(row.get('nivel_ingles_req'))
-    req_esp = map_level(row.get('nivel_espanhol_req'))
-    req_acad = parse_req_acad(job_text)
-    job_pcd = parse_req_pcd(job_text)
-    job_sap = parse_req_sap(job_text, row.get('vaga_sap'))
-
-    row_features = artifact.build_feature_row(
-        cv_pt_clean=cv_text,
-        req_text_clean=job_text,
-        ing_ord=ing_ord,
-        esp_ord=esp_ord,
-        acad_ord=acad_ord,
-        req_ing_ord=req_ing,
-        req_esp_ord=req_esp,
-        req_acad_ord=req_acad,
-        pcd_flag=pcd_flag,
-        job_pcd_req=job_pcd,
-        has_sap=has_sap,
-        job_sap_req=job_sap,
-        skills_list=skill_list,
+    # Experiência SAP
+    if job_sap_req == 1:
+        sap_ok = bool(has_sap)
+        sap_status = "Experiência confirmada" if sap_ok else "Necessita experiência em SAP"
+    else:
+        sap_ok = True
+        sap_status = "Não obrigatório" if not has_sap else "Experiência disponível"
+    add_card(
+        "Experiência SAP",
+        "Sim" if has_sap else "Não",
+        "Sim" if job_sap_req else "Não",
+        sap_status,
+        sap_ok,
     )
+
+    st.markdown(f"<div class='match-grid'>{''.join(cards_html)}</div>", unsafe_allow_html=True)
+
+    # Exibe skills considerados
+    if skill_list:
+        skill_pills = "".join(f"<span class='skill-pill'>{escape(skill)}</span>" for skill in skill_list)
+        st.markdown(
+            f"<div class='skill-section'><span class='skill-title'>Skills considerados na análise</span><div class='skill-pill-container'>{skill_pills}</div></div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("Nenhum skill informado até o momento.")
+
+    st.divider()
+    st.subheader("Sugestão de vagas com maior aderência")
+
+    # Carrega a base de vagas e monta sugestões
     try:
-        score = float(artifact.predict_proba(row_features)) * 100.0
-    except Exception:
-        continue
-    suggestions.append({
-        'job_id': str(jid),
-        'Vaga': row.get('titulo_vaga', ''),
-        'Cliente': row.get('cliente', ''),
-        'Score (%)': round(score, 2),
-    })
+        _apps, jobs_base, _prospects = tab2_load_base_data()
+    except Exception as exc:
+        st.info(f"Não foi possível carregar a base de vagas para recomendação: {exc}")
+        st.stop()
 
-if not suggestions:
-    st.info('Nenhuma outra vaga foi encontrada para recomendação.')
-    st.stop()
-
-suggestions_df = pd.DataFrame(suggestions)
-suggestions_df = suggestions_df[suggestions_df['job_id'] != job_id_str]
-if suggestions_df.empty:
-    st.info('Nenhuma outra vaga atinge score relevante neste momento.')
-    st.stop()
-
-top_suggestions = suggestions_df.sort_values('Score (%)', ascending=False).head(5)
-st.dataframe(top_suggestions[['job_id', 'Vaga', 'Cliente', 'Score (%)']], use_container_width=True)
+    suggestions: list[tuple[str, float]] = []
+    for idx, row in jobs_base.iterrows():
+        if row.get("job_id") == job_id:
+            continue
+        sim = cosine_01(artifact.vectorize_job(row["req_text_clean"]), artifact.vectorize_job(req_text_clean))
+        suggestions.append((row["job_id"], sim))
+    suggestions.sort(key=lambda x: x[1], reverse=True)
+    if suggestions:
+        top_suggestions = pd.DataFrame(
+            [(job_id, f"{sim * 100:.1f}%") for job_id, sim in suggestions[:10]],
+            columns=["Job ID", "Similitude"],
+        )
+        st.dataframe(top_suggestions, width="stretch")
+    else:
+        st.warning("Nenhuma vaga similar encontrada.")
 
 def _render_sourcing() -> None:
     st.subheader('Sugestão de candidatos livres')
