@@ -1005,10 +1005,15 @@ def tab2_get_artifact():
 
 @st.cache_data(show_spinner=False)
 def tab2_load_base_data():
-    apps = load_applicants().reset_index()
-    jobs = load_jobs().reset_index()
+    apps_raw = load_applicants()
+    apps_df = apps_raw[0] if isinstance(apps_raw, tuple) else apps_raw
+    apps = apps_df.reset_index(drop=True)
+    
+    jobs_raw = load_jobs()
+    jobs_df = jobs_raw[0] if isinstance(jobs_raw, tuple) else jobs_raw
+    jobs = jobs_df.reset_index(drop=True)
     prospects = load_prospects()[["candidate_id"]]
-
+    
     apps = apps.drop_duplicates('candidate_id').set_index('candidate_id')
     for col in ['skills_text', 'cv_pt', 'cv_pt_clean', 'cv_pt_clean_noaccents', 'cv_en']:
         if col in apps.columns:
