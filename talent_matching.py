@@ -16,6 +16,8 @@ from train_mlp import pick_cv_text, pick_req_text
 from src.utils import safe_list_parse
 from src.preprocessing import load_applicants, load_jobs
 
+
+
 ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
@@ -29,20 +31,6 @@ def resolve_artifact(rel_path: str) -> str | None:
         if p.exists():
             return str(p)
     return None
-
-def segmented_or_radio(label, options, index=0):
-    """Usa segmented_control quando existir; caso contrário radio horizontal."""
-    if hasattr(st, "segmented_control"):
-        try:
-            return st.segmented_control(label=label, options=options, default=options[index])
-        except TypeError:
-            try:
-                val = st.segmented_control(label=label, options=options)
-                return val if val is not None else options[index]
-            except Exception:
-                pass
-    return st.radio(label, options=options, index=index, horizontal=True)
-
 
 HAS_MLP = False
 try:
@@ -141,9 +129,8 @@ def parse_req_sap(req_text, vaga_sap_field=None):
     return int(("sap" in s) or ("4hana" in s) or ("s/4hana" in s) or ("s4hana" in s))
 
 
-# Pegar credenciais do secrets
-os.environ["KAGGLE_USERNAME"] = st.secrets["kaggle"]["username"]
-os.environ["KAGGLE_KEY"] = st.secrets["kaggle"]["key"]
+# Pegar credenciais do secrets apenas quando necessário (não durante importação).
+# A configuração do Kaggle deve ser feita dinamicamente (ver função load_jobs).
 
 from kaggle.api.kaggle_api_extended import KaggleApi
 
@@ -152,6 +139,27 @@ from kaggle.api.kaggle_api_extended import KaggleApi
 # ----------------------------
 KAGGLE_DATASET = "naiaraderossi/DatathonDataset" 
 VAGAS_FILENAME = "vagas.json"
+
+# Diretório padrão para os arquivos de dados. Se não existir, `load_jobs` o cria.
+base_dir_default = Path("data")
+
+def segmented_or_radio(label, options, index=0):
+    """
+    Helper para escolher entre o segmented_control (quando disponível) e radio.
+    Se a versão do Streamlit não suportar 'default', faz fallback para radio horizontal.
+    """
+    if hasattr(st, "segmented_control"):
+        try:
+            return st.segmented_control(label=label, options=options, default=options[index])
+        except TypeError:
+            # Tentativas para versões com assinaturas diferentes
+            try:
+                val = st.segmented_control(label=label, options=options)
+                return val if val is not None else options[index]
+            except Exception:
+                pass
+    # Fallback: radio horizontal
+    return st.radio(label, options, index=index, horizontal=True)
 
 # ----------------------------
 # Função para carregar vagas
@@ -174,14 +182,27 @@ def load_jobs(base_dir=None, uploaded_file=None):
     # Baixar do Kaggle se não existir
     if not path.exists():
         st.info(f"Arquivo {VAGAS_FILENAME} não encontrado localmente. Baixando do Kaggle...")
-        api = KaggleApi()
-        api.authenticate()
 
-        api.dataset_download_files(
-            KAGGLE_DATASET,
-            path=base_dir,
-            unzip=True
-        )
+        # Carregar credenciais do Kaggle de variáveis de ambiente ou st.secrets
+        if not (os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")) and hasattr(st, "secrets"):
+            creds = st.secrets.get("kaggle", {})
+            os.environ.setdefault("KAGGLE_USERNAME", creds.get("username", ""))
+            os.environ.setdefault("KAGGLE_KEY", creds.get("key", ""))
+
+        api = KaggleApi()
+        try:
+            api.authenticate()
+        except Exception as exc:
+            return pd.DataFrame(), {"error": f"Falha ao autenticar no Kaggle: {exc}"}
+
+        try:
+            api.dataset_download_files(
+                KAGGLE_DATASET,
+                path=base_dir,
+                unzip=True
+            )
+        except Exception as exc:
+            return pd.DataFrame(), {"error": f"Erro ao baixar dataset do Kaggle: {exc}"}
 
         if not path.exists():
             return pd.DataFrame(), {"error": f"Arquivo não encontrado após download: {path}"}
@@ -230,7 +251,7 @@ def render_app(section: str | None = None) -> None:
     st.title("Triagem e Recomendações de Talentos")
 
     # Carregar as vagas
-    df_jobs, err = load_jobs()
+    df_jobs, err = load_jobs(base_dir_default)
     if err:
         st.error(err["error"])
         st.stop()
@@ -388,7 +409,13 @@ def extract_req_skills(req_text: str) -> list[str]:
 # -------------------------
 
 def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
-    """Renderiza o formulário padronizado de entrevista e exibe análises/sugestões."""
+    """
+    Renderiza o formulário de entrevista padronizado e realiza a análise do
+    candidato em relação à vaga selecionada. Todo o fluxo do formulário, desde
+    os campos de entrada até a recomendação de vagas similares, está contido
+    nesta função para evitar variáveis fora de escopo ou efeitos colaterais na
+    importação.
+    """
     st.subheader("Formulário de entrevista (padronizado)")
 
     levels_display = [
@@ -413,7 +440,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     def level_label(idx: int, catalog: list[str]) -> str:
         return catalog[idx] if 0 <= idx < len(catalog) else str(idx)
 
-    # Início do formulário: todos os widgets ficam dentro do with form
+    # Início do formulário. Widgets devem ser declarados dentro do `with form:`.
     form = st.form("frm_interview")
     with form:
         c1, c2, c3 = st.columns(3)
@@ -479,7 +506,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
         # Botão de submissão do formulário
         submitted = form.form_submit_button("Analisar candidato!")
 
-    # Fora do with form, mas ainda dentro da função: trata submissão e analisa dados
+    # Fora do with form: tratar submissão e executar lógica de inferência
     if not submitted:
         st.stop()
 
@@ -495,6 +522,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
         st.warning("Preencha os campos obrigatórios: " + ", ".join(missing))
         st.stop()
 
+    # Verificação da disponibilidade do modelo
     if not HAS_MLP:
         st.error("Modelo MLP não disponível. Garanta que os artefatos estejam na pasta `models/`.")
         st.stop()
@@ -508,6 +536,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
         st.error(f"Não foi possível carregar o modelo: {exc}")
         st.stop()
 
+    # Construir lista de skills combinada (evitar duplicatas)
     extras = [item.strip() for item in skills_extra.split(",") if item.strip()]
     combined_skills = skills + competencias_sugeridas + extras
     skill_list: list[str] = []
@@ -519,17 +548,18 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     esp_ord = map_level(nivel_espanhol)
     acad_ord = map_acad(nivel_acad)
     pcd_flag = 1 if pcd_flag_ui.lower().startswith("s") else 0
+    # Detectar SAP usando função específica (compatível com tab2)
     has_sap = detect_sap_tab2(skill_list, "", cv_text)
 
+    # Requisitos da vaga (podem vir do DataFrame job_row ou ser extraídos do texto)
     req_ing_ord = int(job_row.get("req_ing_ord", parse_req_lang(req_text_clean, "ingles")))
     req_esp_ord = int(job_row.get("req_esp_ord", parse_req_lang(req_text_clean, "espanhol")))
     req_acad_ord = int(job_row.get("req_acad_ord", parse_req_acad(req_text_clean)))
-    job_pcd_req = int(
-        job_row.get("job_pcd_req", parse_req_pcd(req_text_clean))
-    )
-    job_sap_req = int(
-        job_row.get("job_sap_req", parse_req_sap(req_text_clean, job_row.get("vaga_sap_raw") or job_row.get("vaga_sap")))
-    )
+    job_pcd_req = int(job_row.get("job_pcd_req", parse_req_pcd(req_text_clean)))
+    job_sap_req = int(job_row.get(
+        "job_sap_req",
+        parse_req_sap(req_text_clean, job_row.get("vaga_sap_raw") or job_row.get("vaga_sap")),
+    ))
 
     feature_row = artifact.build_feature_row(
         cv_pt_clean=cv_text,
@@ -556,7 +586,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     score_percent = probability * 100.0
     st.success(f"Aderência estimada para a vaga {job_id}: {score_percent:.1f}%")
 
-    # Estilos para os cards de aderência
+    # Estilização para os cartões e pills
     st.markdown(
         """
         <style>
@@ -638,33 +668,38 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
         unsafe_allow_html=True,
     )
 
-    # Monta os cartões de aderência
     cards_html: list[str] = []
+
+    def add_card(title: str, current: str, requirement: str, status: str, ok: bool) -> None:
+        cls = "ok" if ok else "warn"
+        icon = "✅" if ok else "⚠️"
+        cards_html.append(
+            f"<div class='match-card {cls}'>"
+            f"<div class='match-label'>{escape(title)}</div>"
+            f"<div class='match-value'>{icon} {escape(current)}</div>"
+            f"<div class='match-req'>Requisito: {escape(requirement)}</div>"
+            f"<div class='match-status'>{escape(status)}</div>"
+            "</div>"
+        )
+
+    def format_level_status(actual_ord: int, req_ord: int) -> tuple[bool, str]:
+        diff = actual_ord - req_ord
+        if diff > 0:
+            label = "nível" if diff == 1 else "níveis"
+            return True, f"Acima do requisito (+{diff} {label})"
+        if diff == 0:
+            return True, "Dentro do requisito"
+        label = "nível" if abs(diff) == 1 else "níveis"
+        return False, f"Abaixo do requisito (-{abs(diff)} {label})"
+
+    # Gera cartões de aderência
     ok_ing, status_ing = format_level_status(ing_ord, req_ing_ord)
     ok_esp, status_esp = format_level_status(esp_ord, req_esp_ord)
     ok_acad, status_acad = format_level_status(acad_ord, req_acad_ord)
 
-    add_card(
-        "Inglês",
-        level_label(ing_ord, levels_display),
-        level_label(req_ing_ord, levels_display),
-        status_ing,
-        ok_ing,
-    )
-    add_card(
-        "Espanhol",
-        level_label(esp_ord, levels_display),
-        level_label(req_esp_ord, levels_display),
-        status_esp,
-        ok_esp,
-    )
-    add_card(
-        "Formação",
-        level_label(acad_ord, academico_display),
-        level_label(req_acad_ord, academico_display),
-        status_acad,
-        ok_acad,
-    )
+    add_card("Inglês", level_label(ing_ord, levels_display), level_label(req_ing_ord, levels_display), status_ing, ok_ing)
+    add_card("Espanhol", level_label(esp_ord, levels_display), level_label(req_esp_ord, levels_display), status_esp, ok_esp)
+    add_card("Formação", level_label(acad_ord, academico_display), level_label(req_acad_ord, academico_display), status_acad, ok_acad)
 
     # Critério PCD
     if job_pcd_req == 1:
@@ -673,13 +708,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     else:
         pcd_ok = True
         pcd_status = "Não obrigatório" if not pcd_flag else "Candidato PCD (diferencial)"
-    add_card(
-        "Critério PCD",
-        "Sim" if pcd_flag else "Não",
-        "Sim" if job_pcd_req else "Não",
-        pcd_status,
-        pcd_ok,
-    )
+    add_card("Critério PCD", "Sim" if pcd_flag else "Não", "Sim" if job_pcd_req else "Não", pcd_status, pcd_ok)
 
     # Experiência SAP
     if job_sap_req == 1:
@@ -688,19 +717,13 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     else:
         sap_ok = True
         sap_status = "Não obrigatório" if not has_sap else "Experiência disponível"
-    add_card(
-        "Experiência SAP",
-        "Sim" if has_sap else "Não",
-        "Sim" if job_sap_req else "Não",
-        sap_status,
-        sap_ok,
-    )
+    add_card("Experiência SAP", "Sim" if has_sap else "Não", "Sim" if job_sap_req else "Não", sap_status, sap_ok)
 
     st.markdown(f"<div class='match-grid'>{''.join(cards_html)}</div>", unsafe_allow_html=True)
 
-    # Exibe skills considerados
+    # Exibe as skills consideradas
     if skill_list:
-        skill_pills = "".join(f"<span class='skill-pill'>{escape(skill)}</span>" for skill in skill_list)
+        skill_pills = ''.join(f"<span class='skill-pill'>{escape(skill)}</span>" for skill in skill_list)
         st.markdown(
             f"<div class='skill-section'><span class='skill-title'>Skills considerados na análise</span><div class='skill-pill-container'>{skill_pills}</div></div>",
             unsafe_allow_html=True,
@@ -711,28 +734,63 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     st.divider()
     st.subheader("Sugestão de vagas com maior aderência")
 
-    # Carrega a base de vagas e monta sugestões
+    # Carrega a base de vagas para recomendação
     try:
         _apps, jobs_base, _prospects = tab2_load_base_data()
     except Exception as exc:
         st.info(f"Não foi possível carregar a base de vagas para recomendação: {exc}")
         st.stop()
 
-    suggestions: list[tuple[str, float]] = []
-    for idx, row in jobs_base.iterrows():
-        if row.get("job_id") == job_id:
+    suggestions: list[dict] = []
+    job_id_str = str(job_id)
+    for jid, row in jobs_base.iterrows():
+        job_text = pick_req_text(row)
+        if not isinstance(job_text, str) or not job_text.strip():
             continue
-        sim = cosine_01(artifact.vectorize_job(row["req_text_clean"]), artifact.vectorize_job(req_text_clean))
-        suggestions.append((row["job_id"], sim))
-    suggestions.sort(key=lambda x: x[1], reverse=True)
-    if suggestions:
-        top_suggestions = pd.DataFrame(
-            [(job_id, f"{sim * 100:.1f}%") for job_id, sim in suggestions[:10]],
-            columns=["Job ID", "Similitude"],
+        req_ing = map_level(row.get("nivel_ingles_req"))
+        req_esp = map_level(row.get("nivel_espanhol_req"))
+        req_acad = parse_req_acad(job_text)
+        job_pcd = parse_req_pcd(job_text)
+        job_sap = parse_req_sap(job_text, row.get("vaga_sap"))
+
+        row_features = artifact.build_feature_row(
+            cv_pt_clean=cv_text,
+            req_text_clean=job_text,
+            ing_ord=ing_ord,
+            esp_ord=esp_ord,
+            acad_ord=acad_ord,
+            req_ing_ord=req_ing,
+            req_esp_ord=req_esp,
+            req_acad_ord=req_acad,
+            pcd_flag=pcd_flag,
+            job_pcd_req=job_pcd,
+            has_sap=has_sap,
+            job_sap_req=job_sap,
+            skills_list=skill_list,
         )
-        st.dataframe(top_suggestions, width="stretch")
-    else:
-        st.warning("Nenhuma vaga similar encontrada.")
+        try:
+            score = float(artifact.predict_proba(row_features)) * 100.0
+        except Exception:
+            continue
+        suggestions.append({
+            "job_id": str(jid),
+            "Vaga": row.get("titulo_vaga", ""),
+            "Cliente": row.get("cliente", ""),
+            "Score (%)": round(score, 2),
+        })
+
+    if not suggestions:
+        st.info("Nenhuma outra vaga foi encontrada para recomendação.")
+        st.stop()
+
+    suggestions_df = pd.DataFrame(suggestions)
+    suggestions_df = suggestions_df[suggestions_df["job_id"] != job_id_str]
+    if suggestions_df.empty:
+        st.info("Nenhuma outra vaga atinge score relevante neste momento.")
+        st.stop()
+
+    top_suggestions = suggestions_df.sort_values("Score (%)", ascending=False).head(5)
+    st.dataframe(top_suggestions[["job_id", "Vaga", "Cliente", "Score (%)"]], width="stretch")
 
 def _render_sourcing() -> None:
     st.subheader('Sugestão de candidatos livres')
@@ -823,7 +881,8 @@ def _render_sourcing() -> None:
                         table['Token overlap'] = (table['Token overlap'] * 100).round(1)
                     if 'Score (%)' in table.columns:
                         table = table.round({'Score (%)': 2})
-                    st.dataframe(table, use_container_width=True)
+                    # Ajustar largura segundo nova API (use_container_width descontinuado)
+                    st.dataframe(table, width="stretch")
 
                     csv = filtered_tab2.reset_index()[['candidate_id', 'nome', 'email', 'telefone', 'prob_percent'] + NUM_COLS]
                     st.download_button(
@@ -946,16 +1005,8 @@ def tab2_get_artifact():
 
 @st.cache_data(show_spinner=False)
 def tab2_load_base_data():
-    apps = load_applicants()
-    # Some loaders may return a tuple (df, info), handle both forms
-    if isinstance(apps, tuple):
-        apps, _ = apps
-    apps = apps.reset_index()
-
-    jobs = load_jobs()
-    if isinstance(jobs, tuple):
-        jobs, _ = jobs
-    jobs = jobs.reset_index()
+    apps = load_applicants().reset_index()
+    jobs = load_jobs().reset_index()
     prospects = load_prospects()[["candidate_id"]]
 
     apps = apps.drop_duplicates('candidate_id').set_index('candidate_id')
