@@ -819,7 +819,7 @@ def _render_sourcing() -> None:
         job_id_tab2 = st.selectbox(
             'Selecione a vaga (Base CSV)',
             job_options_tab2,
-            format_func=lambda j: f"{j}  {jobs_tab2.loc[j, 'titulo_vaga']}"
+            format_func=lambda j: f"{j}  {jobs_tab2.loc[j, 'titulo']}"
         )
         threshold_default_tab2 = json.loads(Path('models/thresholds.json').read_text(encoding='utf-8'))['mlp_thresholds']['thr_f1']
         threshold_tab2 = st.slider('Threshold (probabilidade mínima)', 0.0, 1.0, float(threshold_default_tab2), 0.01)
