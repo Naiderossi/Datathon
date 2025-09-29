@@ -261,49 +261,29 @@ def render_app(section: str | None = None) -> None:
         st.stop()
 
     jobs_indexed = df_jobs.set_index("job_id")
-    job_options = jobs_indexed.index.tolist()
-
-    # Função auxiliar para formatar label da vaga
-    def job_label(job_id: str) -> str:
-        row = jobs_indexed.loc[job_id]
-        titulo = str(row.get("titulo", "")).strip()
-        cliente = str(row.get("cliente", "")).strip()
-        parts = [str(job_id)]
-        if titulo:
-            parts.append(titulo)
-        if cliente:
-            parts.append(cliente)
-        return " - ".join(parts)
-
-    # Interface da seleção de vagas
-    st.subheader("Vaga em análise")
-    sel_job = st.selectbox(
-        "Selecione a vaga",
-        job_options,
-        index=0,
-        format_func=job_label
-    )
-
-    sel_row = jobs_indexed.loc[sel_job]
-    req_text_clean = str(sel_row.req_text_clean or "")
-
-    with st.expander("Requisitos estimados da vaga", expanded=False):
-        st.markdown(
-            f"- Inglês: **{LEVELS[sel_row.req_ing_ord]}**\n"
-            f"- Espanhol: **{LEVELS[sel_row.req_esp_ord]}**\n"
-            f"- Acadêmico: **{ACADEMICO[sel_row.req_acad_ord]}**\n"
-            f"- PCD requerido: **{'Sim' if sel_row.job_pcd_req == 1 else 'Não'}**\n"
-            f"- Requer SAP: **{'Sim' if sel_row.job_sap_req == 1 else 'Não'}**"
-        )
-
+    
     if section is None:
-        tab1, tab2 = st.tabs(['Formulário e Predição', 'Sugestão de Candidatos'])
-        with tab1:
-            _render_form(req_text_clean, sel_row, sel_job)
+        tab2, tab1 = st.tabs(["Sugestão de Candidatos", "Formulário e Predição"])
         with tab2:
             _render_sourcing()
+        with tab1:
+            sel_job = st.session_state.get("selected_job_id")
+            if not sel_job or sel_job not in jobs_indexed.index:
+                st.info("Selecione uma vaga na aba **Sugestão de Candidatos** para habilitar o formulário.")
+                st.stop()
+            sel_row = jobs_indexed.loc[sel_job]
+            req_text_clean = str(sel_row.req_text_clean or "")
+            _render_form(req_text_clean, sel_row, sel_job)
+
     elif section == "form":
+        sel_job = st.session_state.get("selected_job_id")
+        if not sel_job or sel_job not in jobs_indexed.index:
+            st.info("Selecione uma vaga na aba **Sugestão de Candidatos**.")
+            st.stop()
+        sel_row = jobs_indexed.loc[sel_job]
+        req_text_clean = str(sel_row.req_text_clean or "")
         _render_form(req_text_clean, sel_row, sel_job)
+
     elif section == "sourcing":
         _render_sourcing()
     else:
@@ -793,52 +773,79 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
     st.dataframe(top_suggestions[["job_id", "Vaga", "Cliente", "Score (%)"]], width="stretch")
 
 def _render_sourcing() -> None:
-    st.subheader('Sugestão de candidatos livres')
-    uploaded_jobs_file = st.file_uploader('Upload de novas vagas (CSV opcional)', type='csv', help='O arquivo deve conter ao menos job_id e campos de descrio.')
-    extra_jobs_df = None
-    if uploaded_jobs_file is not None:
-        try:
-            extra_jobs_df = pd.read_csv(uploaded_jobs_file)
-            st.success(f'{len(extra_jobs_df)} linhas carregadas do CSV.')
-        except Exception as exc:
-            st.error(f'Não foi possível ler o CSV: {exc}')
-            extra_jobs_df = None
-
+    
     apps_tab2, jobs_tab2, prospect_ids_tab2 = tab2_load_base_data()
-    if extra_jobs_df is not None and not extra_jobs_df.empty:
-        extra_jobs = tab2_prepare_jobs(extra_jobs_df)
-        if not extra_jobs.empty:
-            jobs_tab2 = pd.concat([jobs_tab2.reset_index(), extra_jobs.reset_index()], ignore_index=True, sort=False)
-            jobs_tab2 = jobs_tab2.drop_duplicates('job_id').set_index('job_id')
+    if jobs_tab2 is None or jobs_tab2.empty:
+        st.info("Nenhuma vaga encontrada na base.")
+        return
 
+    # Seleção ÚNICA de vaga
+    job_options_tab2 = jobs_tab2.index.tolist()
+    # coluna de título mais provável no seu DF é "titulo" (no seu load_jobs você preenche "titulo")
+    title_col = "titulo" if "titulo" in jobs_tab2.columns else (
+        "titulo_vaga" if "titulo_vaga" in jobs_tab2.columns else None
+    )
+
+    def job_label(j):
+        try:
+            parts = [str(j)]
+            if title_col:
+                parts.append(str(jobs_tab2.at[j, title_col]).strip())
+            cliente = str(jobs_tab2.at[j, "cliente"]).strip() if "cliente" in jobs_tab2.columns else ""
+            if cliente:
+                parts.append(cliente)
+            return " - ".join([p for p in parts if p])
+        except Exception:
+            return str(j)
+
+    job_id_tab2 = st.selectbox(
+        "Selecione a vaga",
+        job_options_tab2,
+        format_func=job_label,
+    )
+
+    # Salvar seleção para ser usada na aba Formulário
+    st.session_state["selected_job_id"] = job_id_tab2
+
+    # Threshold com fallback robusto
+    thr_default = 0.34
+    try:
+        meta = json.loads(Path("models/thresholds.json").read_text(encoding="utf-8"))
+        thr_default = float(meta.get("mlp_thresholds", {}).get("thr_f1", thr_default))
+    except Exception:
+        pass
+
+    threshold_tab2 = st.slider(
+        "Threshold (probabilidade mínima)",
+        0.0, 1.0, float(thr_default), 0.01
+    )
+    max_results_tab2 = st.slider("Quantidade máxima de candidatos", 10, 200, 50, 10)
+
+    # Pool de candidatos livres
     available_candidates = apps_tab2.index.difference(prospect_ids_tab2)
     if available_candidates.empty:
-        st.info('Nenhum candidato livre encontrado.')
-    else:
-        job_options_tab2 = jobs_tab2.index.tolist()
-        job_id_tab2 = st.selectbox(
-            'Selecione a vaga (Base CSV)',
-            job_options_tab2,
-            format_func=lambda j: f"{j}  {jobs_tab2.loc[j, 'titulo']}"
-        )
-        threshold_default_tab2 = json.loads(Path('models/thresholds.json').read_text(encoding='utf-8'))['mlp_thresholds']['thr_f1']
-        threshold_tab2 = st.slider('Threshold (probabilidade mínima)', 0.0, 1.0, float(threshold_default_tab2), 0.01)
-        max_results_tab2 = st.slider('Quantidade máxima de candidatos', 10, 200, 50, 10)
+        st.info("Nenhum candidato livre encontrado.")
+        return
 
-        if st.button('Buscar candidatos sugeridos', type='primary'):
+    if st.button("Buscar candidatos sugeridos", type="primary"):
+        try:
             job_row = jobs_tab2.loc[job_id_tab2]
             req_text = pick_req_text(job_row)
-            req_ing_ord = map_level(job_row.get('nivel_ingles_req'))
-            req_esp_ord = map_level(job_row.get('nivel_espanhol_req'))
+            req_ing_ord = map_level(job_row.get("nivel_ingles_req"))
+            req_esp_ord = map_level(job_row.get("nivel_espanhol_req"))
             req_acad_ord = parse_req_acad(req_text)
             job_pcd_req = parse_req_pcd(req_text)
-            job_sap_req = parse_req_sap(req_text, job_row.get('vaga_sap'))
+            job_sap_req = parse_req_sap(req_text, job_row.get("vaga_sap"))
 
-            with st.spinner('Gerando recomendações...'):
+            with st.spinner("Gerando recomendações..."):
                 scored = tab2_score_candidates(job_id_tab2, apps_tab2, jobs_tab2, available_candidates)
 
-            st.markdown(f"### Vaga {job_id_tab2}  {job_row.titulo_vaga} ({job_row.cliente})")
-            with st.expander('Requisitos da vaga (CSV/Base)', expanded=True):
+            # ---- Resultado + "Vaga em análise" (depois) ----
+            titulo_txt = str(job_row.get(title_col, "")).strip() if title_col else ""
+            cliente_txt = str(job_row.get("cliente", "")).strip()
+            st.markdown(f"### Vaga {job_id_tab2}  {titulo_txt} {f'({cliente_txt})' if cliente_txt else ''}")
+
+            with st.expander("Requisitos da vaga", expanded=True):
                 st.markdown(
                     f"- Inglês requerido: **{LEVELS[req_ing_ord]}**\n"
                     f"- Espanhol requerido: **{LEVELS[req_esp_ord]}**\n"
@@ -846,74 +853,72 @@ def _render_sourcing() -> None:
                     f"- PCD requerido: **{'Sim' if job_pcd_req == 1 else 'Não'}**\n"
                     f"- Exige SAP: **{'Sim' if job_sap_req == 1 else 'Não'}**"
                 )
-                st.text_area('Descrição da vaga', value=req_text or '(Sem descrição)', height=160)
+                st.text_area("Descrição da vaga", value=req_text or "(Sem descrição)", height=160)
 
             if scored.empty:
-                st.info('Nenhum candidato elegível para esta vaga.')
-            else:
-                filtered_tab2 = scored[scored['probability'] >= threshold_tab2]
-                filtered_tab2 = filtered_tab2.sort_values('probability', ascending=False).head(max_results_tab2)
-                if filtered_tab2.empty:
-                    st.info('Nenhum candidato atingiu o corte definido. Ajuste o threshold ou aumente o limite.')
-                else:
-                    rename_map = {
-                        'nome': 'Candidato',
-                        'nivel_ingles': 'Inglês',
-                        'nível_ingles': 'Inglês',
-                        'nivel_espanhol': 'Espanhol',
-                        'nível_espanhol': 'Espanhol',
-                        'nivel_academico': 'Formação',
-                        'nível_academico': 'Formação',
-                        'prob_percent': 'Score (%)',
-                        'pcd_flag': 'PCD',
-                        'has_sap': 'SAP',
-                        'skill_overlap': 'Skills match',
-                        'token_overlap_ratio': 'Token overlap'
-                    }
-                    table = filtered_tab2.rename(columns=rename_map)
-                    display_cols = ['Candidato', 'Inglês', 'Espanhol', 'Formação', 'Score (%)', 'PCD', 'SAP', 'Skills match', 'Token overlap']
-                    table = table[[col for col in display_cols if col in table.columns]].copy()
-                    if 'PCD' in table.columns:
-                        table['PCD'] = table['PCD'].map({0: 'Não', 1: 'Sim'})
-                    if 'SAP' in table.columns:
-                        table['SAP'] = table['SAP'].map({0: 'Não', 1: 'Sim'})
-                    if 'Token overlap' in table.columns:
-                        table['Token overlap'] = (table['Token overlap'] * 100).round(1)
-                    if 'Score (%)' in table.columns:
-                        table = table.round({'Score (%)': 2})
-                    # Ajustar largura segundo nova API (use_container_width descontinuado)
-                    st.dataframe(table, width="stretch")
+                st.info("Nenhum candidato elegível para esta vaga.")
+                return
 
-                    csv = filtered_tab2.reset_index()[['candidate_id', 'nome', 'email', 'telefone', 'prob_percent'] + NUM_COLS]
-                    st.download_button(
-                        'Baixar CSV (tab Sugestões)',
-                        csv.to_csv(index=False).encode('utf-8'),
-                        file_name=f'sugestoes_tab2_vaga_{job_id_tab2}.csv',
-                        mime='text/csv'
-                    )
+            filtered_tab2 = scored[scored["probability"] >= threshold_tab2]
+            filtered_tab2 = filtered_tab2.sort_values("probability", ascending=False).head(max_results_tab2)
+            if filtered_tab2.empty:
+                st.info("Nenhum candidato atingiu o corte definido. Ajuste o threshold ou aumente o limite.")
+                return
 
-                    top5 = filtered_tab2.head(5)
-                    if not top5.empty:
-                        if st.button('Agendar entrevistas (Top 5)', type='secondary'):
-                            agenda_info = []
-                            for _, row in top5.iterrows():
-                                nome = str(row.get('nome') or 'Sem nome')
-                                email = str(row.get('email') or '').strip()
-                                agenda_info.append(f"{nome} <{email}>" if email else nome)
-                            st.success('Agendamento enviado para: ' + ', '.join(agenda_info))
+            rename_map = {
+                "nome": "Candidato",
+                "nivel_ingles": "Inglês",
+                "nível_ingles": "Inglês",
+                "nivel_espanhol": "Espanhol",
+                "nível_espanhol": "Espanhol",
+                "nivel_academico": "Formação",
+                "nível_academico": "Formação",
+                "prob_percent": "Score (%)",
+                "pcd_flag": "PCD",
+                "has_sap": "SAP",
+                "skill_overlap": "Skills match",
+                "token_overlap_ratio": "Token overlap",
+            }
+            table = filtered_tab2.rename(columns=rename_map)
+            display_cols = ["Candidato", "Inglês", "Espanhol", "Formação", "Score (%)", "PCD", "SAP", "Skills match", "Token overlap"]
+            table = table[[c for c in display_cols if c in table.columns]].copy()
+            if "PCD" in table.columns:
+                table["PCD"] = table["PCD"].map({0: "Não", 1: "Sim"})
+            if "SAP" in table.columns:
+                table["SAP"] = table["SAP"].map({0: "Não", 1: "Sim"})
+            if "Token overlap" in table.columns:
+                table["Token overlap"] = (table["Token overlap"] * 100).round(1)
+            if "Score (%)" in table.columns:
+                table = table.round({"Score (%)": 2})
+            st.dataframe(table, width="stretch")
 
-                    with st.expander('Ver currículo (cv_pt) de um candidato sugerido'):
-                        selection = st.selectbox(
-                            'Candidato',
-                            filtered_tab2.index.tolist(),
-                            format_func=lambda cid: f"{cid}  {filtered_tab2.loc[cid, 'nome']}"
-                        )
-                        selected_cv = filtered_tab2.loc[selection].get('cv_pt') or filtered_tab2.loc[selection].get('cv_text') or '(Currículo não disponível)'
-                        st.text_area('currículo', value=selected_cv, height=280)
+            # download
+            csv = filtered_tab2.reset_index()[["candidate_id", "nome", "email", "telefone", "prob_percent"] + NUM_COLS]
+            st.download_button(
+                "Baixar CSV (tab Sugestões)",
+                csv.to_csv(index=False).encode("utf-8"),
+                file_name=f"sugestoes_tab2_vaga_{job_id_tab2}.csv",
+                mime="text/csv",
+            )
 
-                    st.caption('Sugestões calculadas pelo MLP reentreinado sobre a base CSV. Ajuste cortes conforme necessário.')
-        else:
-            st.info('Selecione a vaga e clique em **Buscar candidatos sugeridos** para ver as recomendações.')
+            # ver CV
+            with st.expander("Ver currículo (cv_pt) de um candidato sugerido"):
+                selection = st.selectbox(
+                    "Candidato",
+                    filtered_tab2.index.tolist(),
+                    format_func=lambda cid: f"{cid}  {filtered_tab2.loc[cid, 'nome']}",
+                )
+                selected_cv = (
+                    filtered_tab2.loc[selection].get("cv_pt")
+                    or filtered_tab2.loc[selection].get("cv_text")
+                    or "(Currículo não disponível)"
+                )
+                st.text_area("currículo", value=selected_cv, height=280)
+
+        except Exception as exc:
+            st.error("Falha ao gerar recomendações. Detalhes abaixo.")
+            st.exception(exc)  # mostra o stacktrace sem derrubar o app
+
 import numpy as np
 
 
