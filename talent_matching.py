@@ -22,11 +22,7 @@ def segmented_or_radio(label, options, index=0):
     return st.radio(label, options=options, index=index, horizontal=True)
 
 from src.mlp_infer import NUM_COLS, cosine_01
-
-try:
-    from train_mlp_refactored import pick_cv_text, pick_req_text
-except Exception:
-    from train_mlp import pick_cv_text, pick_req_text
+from train_mlp import pick_cv_text, pick_req_text
 from src.utils import safe_list_parse
 from src.preprocessing import load_applicants, load_jobs
 
@@ -1123,6 +1119,7 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
+
 
 
 
