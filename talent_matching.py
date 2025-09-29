@@ -286,40 +286,69 @@ def load_jobs(base_dir=None, uploaded_file=None):
 def render_app(section: str | None = None) -> None:
     st.title("Triagem e Recomendações de Talentos")
 
+    # Carrega base de vagas
     df_jobs, err = load_jobs(base_dir_default)
     if err:
-        st.error(err["error"]); st.stop()
+        st.error(err["error"])
+        st.stop()
     if df_jobs.empty:
-        st.warning("Nenhuma vaga carregada."); st.stop()
+        st.warning("Nenhuma vaga carregada.")
+        st.stop()
 
-    jobs_indexed = df_jobs.set_index("job_id")
+    # Índice consistente e único
+    jobs_indexed = _ensure_jobs_index(df_jobs)
 
-    # Abas: Sugestões primeiro (define a vaga); Formulário reusa a vaga escolhida
+    # Helper para obter a vaga selecionada com fallback seguro (primeira vaga)
+    def _get_selected_job_id() -> Any:
+        sel = st.session_state.get("selected_job_id")
+        if sel in jobs_indexed.index:
+            return sel
+        # fallback: primeira vaga disponível
+        if len(jobs_indexed.index) > 0:
+            first_id = jobs_indexed.index[0]
+            st.session_state["selected_job_id"] = first_id
+            st.info("Nenhuma vaga selecionada ainda — usando a primeira vaga como padrão. "
+                    "Você pode alterar na aba **Sugestão de Candidatos**.")
+            return first_id
+        return None
+
+    # Abas: Sugestões primeiro (define a vaga); Formulário reaproveita a vaga escolhida
     if section is None:
         tab2, tab1 = st.tabs(["Sugestão de Candidatos", "Formulário e Predição"])
+
         with tab2:
             _render_sourcing()
+
         with tab1:
-            sel_job = st.session_state.get("selected_job_id")
-            if not sel_job or sel_job not in jobs_indexed.index:
-                st.info("Selecione uma vaga na aba **Sugestão de Candidatos**.")
+            sel_job = _get_selected_job_id()
+            if not sel_job:
                 st.stop()
-            sel_row = jobs_indexed.loc[sel_job]
-            req_text_clean = str(sel_row.req_text_clean or "")
+            try:
+                sel_row = jobs_indexed.loc[sel_job]
+            except KeyError:
+                st.error("Vaga selecionada não encontrada. Selecione outra na aba **Sugestão de Candidatos**.")
+                st.stop()
+            req_text_clean = str(sel_row.get("req_text_clean", "") or "")
             _render_form(req_text_clean, sel_row, sel_job)
+
     elif section == "form":
-        # acesso direto ao formulário
-        sel_job = st.session_state.get("selected_job_id")
-        if not sel_job or sel_job not in jobs_indexed.index:
-            st.info("Selecione uma vaga na aba **Sugestão de Candidatos**.")
+        # Acesso direto ao formulário (ex.: via query param)
+        sel_job = _get_selected_job_id()
+        if not sel_job:
             st.stop()
-        sel_row = jobs_indexed.loc[sel_job]
-        req_text_clean = str(sel_row.req_text_clean or "")
+        try:
+            sel_row = jobs_indexed.loc[sel_job]
+        except KeyError:
+            st.error("Vaga selecionada não encontrada. Selecione outra na aba **Sugestão de Candidatos**.")
+            st.stop()
+        req_text_clean = str(sel_row.get("req_text_clean", "") or "")
         _render_form(req_text_clean, sel_row, sel_job)
+
     elif section == "sourcing":
         _render_sourcing()
+
     else:
-        st.error(f"Seo desconhecida: {section}")
+        st.error(f"Seção desconhecida: {section}")
 
 # -------------------------
 # Catlogo rpido de skills
