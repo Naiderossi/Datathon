@@ -4,7 +4,7 @@ Plataforma interativa em **Streamlit** para apoiar recrutadores na triagem de ta
 
 
 
-##Link do streamlit  
+## Link do streamlit  
 https://datathondecisiontalents.streamlit.app/
 ---
 
