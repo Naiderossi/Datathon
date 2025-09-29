@@ -230,7 +230,7 @@ def render_app(section: str | None = None) -> None:
     st.title("Triagem e Recomendações de Talentos")
 
     # Carregar as vagas
-    df_jobs, err = load_jobs(base_dir)
+    df_jobs, err = load_jobs()
     if err:
         st.error(err["error"])
         st.stop()
