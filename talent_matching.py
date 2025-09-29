@@ -155,6 +155,7 @@ from kaggle.api.kaggle_api_extended import KaggleApi
 KAGGLE_DATASET = "naiaraderossi/DatathonDataset" 
 VAGAS_FILENAME = "vagas.json"
 
+base_dir_default = Path('data')
 # ----------------------------
 # Função para carregar vagas
 # ----------------------------
@@ -1123,7 +1124,6 @@ def tab2_score_candidates(job_id, apps, jobs, candidate_pool):
 
 if __name__ == '__main__':
     render_app()
-
 
 
 
