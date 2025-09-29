@@ -23,7 +23,10 @@ def segmented_or_radio(label, options, index=0):
 
 from src.mlp_infer import NUM_COLS, cosine_01
 
-from train_mlp import pick_cv_text, pick_req_text
+try:
+    from train_mlp_refactored import pick_cv_text, pick_req_text
+except Exception:
+    from train_mlp import pick_cv_text, pick_req_text
 from src.utils import safe_list_parse
 from src.preprocessing import load_applicants, load_jobs
 
