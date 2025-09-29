@@ -1005,31 +1005,47 @@ def tab2_get_artifact():
 
 @st.cache_data(show_spinner=False)
 def tab2_load_base_data():
+    #Carregar candidatos
     apps_raw = load_applicants()
+    # Quando load_applicants devolve (df, err), extraia somente o df
     apps_df = apps_raw[0] if isinstance(apps_raw, tuple) else apps_raw
-    apps = apps_df.reset_index(drop=True)
-    
+    # Se o índice é candidate_id, trazemos para coluna para evitar perda na limpeza
+    if getattr(apps_df.index, "name", None) == "candidate_id" and "candidate_id" not in apps_df.columns:
+        apps_df = apps_df.reset_index()
+    apps = apps_df.copy()
+
+    #Carregar vagas
     jobs_raw = load_jobs()
     jobs_df = jobs_raw[0] if isinstance(jobs_raw, tuple) else jobs_raw
-    jobs = jobs_df.reset_index(drop=True)
+    if getattr(jobs_df.index, "name", None) == "job_id" and "job_id" not in jobs_df.columns:
+        jobs_df = jobs_df.reset_index()
+    jobs = jobs_df.copy()
+
     prospects = load_prospects()[["candidate_id"]]
-    
-    apps = apps.drop_duplicates('candidate_id').set_index('candidate_id')
-    for col in ['skills_text', 'cv_pt', 'cv_pt_clean', 'cv_pt_clean_noaccents', 'cv_en']:
+
+    #Preparar candidatos
+    if "candidate_id" in apps.columns:
+        apps = apps.drop_duplicates("candidate_id").set_index("candidate_id")
+    else:
+        # Se candidate_id não está disponível, apenas deduplicar pelo índice atual
+        apps = apps.drop_duplicates().copy()
+    for col in ["skills_text", "cv_pt", "cv_pt_clean", "cv_pt_clean_noaccents", "cv_en"]:
         if col in apps.columns:
-            apps[col] = apps[col].fillna('')
-    apps['skills_list'] = apps['skills_list'].apply(safe_list_parse_tab2)
-    apps['cv_len_tokens'] = apps.get('cv_len_tokens', 0).fillna(0)
-
-    jobs = jobs.drop_duplicates('job_id').set_index('job_id')
-    for col in ['req_text_clean', 'req_text_clean_noaccents', 'req_text']:
+            apps[col] = apps[col].fillna("")
+    apps["skills_list"] = apps["skills_list"].apply(safe_list_parse_tab2)
+    apps["cv_len_tokens"] = apps.get("cv_len_tokens", 0).fillna(0)
+    #Preparar vagas
+    if "job_id" in jobs.columns:
+        jobs = jobs.drop_duplicates("job_id").set_index("job_id")
+    else:
+        jobs = jobs.drop_duplicates().copy()
+    for col in ["req_text_clean", "req_text_clean_noaccents", "req_text"]:
         if col in jobs.columns:
-            jobs[col] = jobs[col].fillna('')
-    jobs['req_len_tokens'] = jobs.get('req_len_tokens', 0).fillna(0)
+            jobs[col] = jobs[col].fillna("")
+    jobs["req_len_tokens"] = jobs.get("req_len_tokens", 0).fillna(0)
 
-    prospect_ids = set(prospects['candidate_id'])
+    prospect_ids = set(prospects["candidate_id"])
     return apps, jobs, prospect_ids
-
 
 def tab2_prepare_jobs(df):
     df = df.copy()
