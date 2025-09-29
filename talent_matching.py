@@ -1033,7 +1033,7 @@ def tab2_load_base_data():
         if col in apps.columns:
             apps[col] = apps[col].fillna("")
     apps["skills_list"] = apps["skills_list"].apply(safe_list_parse_tab2)
-    apps["cv_len_tokens"] = apps.get("cv_len_tokens", 0).fillna(0)
+    apps["cv_len_tokens"] = apps.get("cv_len_tokens", pd.Series(0, index= apps.index)).fillna(0)
     #Preparar vagas
     if "job_id" in jobs.columns:
         jobs = jobs.drop_duplicates("job_id").set_index("job_id")
@@ -1042,7 +1042,7 @@ def tab2_load_base_data():
     for col in ["req_text_clean", "req_text_clean_noaccents", "req_text"]:
         if col in jobs.columns:
             jobs[col] = jobs[col].fillna("")
-    jobs["req_len_tokens"] = jobs.get("req_len_tokens", 0).fillna(0)
+    jobs["req_len_tokens"] = jobs.get("req_len_tokens", pd.Series(0, index= jobs.index)).fillna(0)
 
     prospect_ids = set(prospects["candidate_id"])
     return apps, jobs, prospect_ids
@@ -1058,7 +1058,7 @@ def tab2_prepare_jobs(df):
     for col in ['req_text_clean', 'req_text_clean_noaccents', 'req_text']:
         if col in df.columns:
             df[col] = df[col].fillna('')
-    df['req_len_tokens'] = df.get('req_len_tokens', 0).fillna(0)
+    df['req_len_tokens'] = df.get('req_len_tokens', pd.Series(0, index = df.index)).fillna(0)
     df = df.drop_duplicates('job_id').set_index('job_id')
     return df
 
