@@ -14,7 +14,7 @@ from src.mlp_infer import NUM_COLS, cosine_01
 
 from train_mlp import pick_cv_text, pick_req_text
 from src.utils import safe_list_parse
-from src.preprocessing import load_applicants, load_jobs
+from src.preprocessing import load_applicants, load_jobs, load_prospects
 
 
 
