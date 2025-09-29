@@ -476,161 +476,161 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
 
         submitted = form.form_submit_button("Analisar candidato!")
 
-# 🔹 A validação só roda se o form foi submetido
-if not submitted:
+        # 🔹 A validação só roda se o form foi submetido
+    if not submitted:
     st.stop()
 
-missing = []
-if not nome.strip():
-    missing.append('nome')
-if not email.strip():
-    missing.append('e-mail')
-if not cv_text.strip():
-    missing.append('currículo (texto livre)')
+    missing = []
+    if not nome.strip():
+        missing.append('nome')
+    if not email.strip():
+        missing.append('e-mail')
+    if not cv_text.strip():
+        missing.append('currículo (texto livre)')
 
-if missing:
-    st.warning('Preencha os campos obrigatórios: ' + ', '.join(missing))
-    st.stop()
+    if missing:
+        st.warning('Preencha os campos obrigatórios: ' + ', '.join(missing))
+        st.stop()
 
-if not HAS_MLP:
-    st.error('Modelo MLP não disponível. Garanta que os artefatos estejam na pasta `models/`.')
-    st.stop()
+    if not HAS_MLP:
+        st.error('Modelo MLP não disponível. Garanta que os artefatos estejam na pasta `models/`.')
+        st.stop()
 
-try:
-    artifact = tab2_get_artifact()
-except FileNotFoundError as exc:
-    st.error(f'Artefato do modelo não encontrado: {exc}')
-    st.stop()
-except Exception as exc:
-    st.error(f'Não foi possível carregar o modelo: {exc}')
-    st.stop()
+    try:
+        artifact = tab2_get_artifact()
+    except FileNotFoundError as exc:
+        st.error(f'Artefato do modelo não encontrado: {exc}')
+        st.stop()
+    except Exception as exc:
+        st.error(f'Não foi possível carregar o modelo: {exc}')
+        st.stop()
 
-extras = [item.strip() for item in skills_extra.split(',') if item.strip()]
-combined_skills = skills + competencias_sugeridas + extras
-skill_list: list[str] = []
-for item in combined_skills:
-    if item and item not in skill_list:
-        skill_list.append(item)
+    extras = [item.strip() for item in skills_extra.split(',') if item.strip()]
+    combined_skills = skills + competencias_sugeridas + extras
+    skill_list: list[str] = []
+    for item in combined_skills:
+        if item and item not in skill_list:
+            skill_list.append(item)
 
-ing_ord = map_level(nivel_ingles)
-esp_ord = map_level(nivel_espanhol)
-acad_ord = map_acad(nivel_acad)
-pcd_flag = 1 if pcd_flag_ui.lower().startswith('s') else 0
-has_sap = detect_sap_tab2(skill_list, '', cv_text)
+    ing_ord = map_level(nivel_ingles)
+    esp_ord = map_level(nivel_espanhol)
+    acad_ord = map_acad(nivel_acad)
+    pcd_flag = 1 if pcd_flag_ui.lower().startswith('s') else 0
+    has_sap = detect_sap_tab2(skill_list, '', cv_text)
 
-req_ing_ord = int(job_row.get('req_ing_ord', parse_req_lang(req_text_clean, 'ingles')))
-req_esp_ord = int(job_row.get('req_esp_ord', parse_req_lang(req_text_clean, 'espanhol')))
-req_acad_ord = int(job_row.get('req_acad_ord', parse_req_acad(req_text_clean)))
-job_pcd_req = int(job_row.get('job_pcd_req', parse_req_pcd(req_text_clean)))
-job_sap_req = int(job_row.get('job_sap_req', parse_req_sap(req_text_clean, job_row.get('vaga_sap_raw') or job_row.get('vaga_sap'))))
+    req_ing_ord = int(job_row.get('req_ing_ord', parse_req_lang(req_text_clean, 'ingles')))
+    req_esp_ord = int(job_row.get('req_esp_ord', parse_req_lang(req_text_clean, 'espanhol')))
+    req_acad_ord = int(job_row.get('req_acad_ord', parse_req_acad(req_text_clean)))
+    job_pcd_req = int(job_row.get('job_pcd_req', parse_req_pcd(req_text_clean)))
+    job_sap_req = int(job_row.get('job_sap_req', parse_req_sap(req_text_clean, job_row.get('vaga_sap_raw') or job_row.get('vaga_sap'))))
 
-feature_row = artifact.build_feature_row(
-    cv_pt_clean=cv_text,
-    req_text_clean=req_text_clean,
-    ing_ord=ing_ord,
-    esp_ord=esp_ord,
-    acad_ord=acad_ord,
-    req_ing_ord=req_ing_ord,
-    req_esp_ord=req_esp_ord,
-    req_acad_ord=req_acad_ord,
-    pcd_flag=pcd_flag,
-    job_pcd_req=job_pcd_req,
-    has_sap=has_sap,
-    job_sap_req=job_sap_req,
-    skills_list=skill_list,
-)
+    feature_row = artifact.build_feature_row(
+        cv_pt_clean=cv_text,
+        req_text_clean=req_text_clean,
+        ing_ord=ing_ord,
+        esp_ord=esp_ord,
+        acad_ord=acad_ord,
+        req_ing_ord=req_ing_ord,
+        req_esp_ord=req_esp_ord,
+        req_acad_ord=req_acad_ord,
+        pcd_flag=pcd_flag,
+        job_pcd_req=job_pcd_req,
+        has_sap=has_sap,
+        job_sap_req=job_sap_req,
+        skills_list=skill_list,
+    )
 
-try:
-    probability = float(artifact.predict_proba(feature_row))
-except Exception as exc:
-    st.error(f'Erro na inferência do MLP: {exc}')
-    st.stop()
+    try:
+        probability = float(artifact.predict_proba(feature_row))
+    except Exception as exc:
+        st.error(f'Erro na inferência do MLP: {exc}')
+        st.stop()
 
-score_percent = probability * 100.0
-st.success(f'Aderência estimada para a vaga {job_id}: {score_percent:.1f}%')
+    score_percent = probability * 100.0
+    st.success(f'Aderência estimada para a vaga {job_id}: {score_percent:.1f}%')
 
-st.markdown(
-    """
-    <style>
-        .match-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            margin: 1rem 0 0 0;
-        }
-        .match-card {
-            flex: 1 1 220px;
-            border-radius: 14px;
-            border: 1px solid #e8eef9;
-            padding: 1rem 1.2rem;
-            background: #f9fbff;
-            box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
-        }
-        .match-card.ok {
-            border-color: #a7f3d0;
-            background: #f1fdf6;
-        }
-        .match-card.warn {
-            border-color: #fecaca;
-            background: #fff6f5;
-        }
-        .match-card .match-label {
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.08em;
-            color: #64748b;
-            margin-bottom: 0.35rem;
-        }
-        .match-card .match-value {
-            font-size: 1.55rem;
-            font-weight: 600;
-            color: #0f172a;
-            margin-bottom: 0.35rem;
-        }
-        .match-card .match-req {
-            font-size: 0.85rem;
-            color: #475569;
-        }
-        .match-card .match-status {
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-top: 0.4rem;
-        }
-        .match-card.ok .match-status {
-            color: #047857;
-        }
-        .match-card.warn .match-status {
-            color: #b91c1c;
-        }
-        .skill-section {
-            margin-top: 1.2rem;
-        }
-        .skill-title {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #334155;
-            margin-bottom: 0.4rem;
-            display: inline-block;
-        }
-        .skill-pill-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        .skill-pill {
-            padding: 0.35rem 0.75rem;
-            border-radius: 999px;
-            background: #eef2ff;
-            color: #3730a3;
-            font-size: 0.85rem;
-            font-weight: 500;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+    st.markdown(
+        """
+        <style>
+            .match-grid {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 1rem;
+                margin: 1rem 0 0 0;
+            }
+            .match-card {
+                flex: 1 1 220px;
+                border-radius: 14px;
+                border: 1px solid #e8eef9;
+                padding: 1rem 1.2rem;
+                background: #f9fbff;
+                box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+            }
+            .match-card.ok {
+                border-color: #a7f3d0;
+                background: #f1fdf6;
+            }
+            .match-card.warn {
+                border-color: #fecaca;
+                background: #fff6f5;
+            }
+            .match-card .match-label {
+                text-transform: uppercase;
+                font-size: 0.75rem;
+                letter-spacing: 0.08em;
+                color: #64748b;
+                margin-bottom: 0.35rem;
+            }
+            .match-card .match-value {
+                font-size: 1.55rem;
+                font-weight: 600;
+                color: #0f172a;
+                margin-bottom: 0.35rem;
+            }
+            .match-card .match-req {
+                font-size: 0.85rem;
+                color: #475569;
+            }
+            .match-card .match-status {
+                font-size: 0.9rem;
+                font-weight: 600;
+                margin-top: 0.4rem;
+            }
+            .match-card.ok .match-status {
+                color: #047857;
+            }
+            .match-card.warn .match-status {
+                color: #b91c1c;
+            }
+            .skill-section {
+                margin-top: 1.2rem;
+            }
+            .skill-title {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: #334155;
+                margin-bottom: 0.4rem;
+                display: inline-block;
+            }
+            .skill-pill-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            .skill-pill {
+                padding: 0.35rem 0.75rem;
+                border-radius: 999px;
+                background: #eef2ff;
+                color: #3730a3;
+                font-size: 0.85rem;
+                font-weight: 500;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-cards_html: list[str] = []
+    cards_html: list[str] = []
 
 def add_card(title: str, current: str, requirement: str, status: str, ok: bool) -> None:
     cls = 'ok' if ok else 'warn'
