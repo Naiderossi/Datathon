@@ -478,7 +478,7 @@ def _render_form(req_text_clean: str, job_row, job_id: str) -> None:
 
         # 🔹 A validação só roda se o form foi submetido
     if not submitted:
-    st.stop()
+        st.stop()
 
     missing = []
     if not nome.strip():
