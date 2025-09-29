@@ -10,6 +10,7 @@ from html import escape
 from ast import literal_eval
 from pathlib import Path
 import io
+from typing import Any
 from src.mlp_infer import NUM_COLS, cosine_01
 
 from train_mlp import pick_cv_text, pick_req_text
