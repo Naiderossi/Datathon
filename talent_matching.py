@@ -250,18 +250,15 @@ def load_jobs(base_dir=None, uploaded_file=None):
 def render_app(section: str | None = None) -> None:
     st.title("Triagem e Recomendações de Talentos")
 
-    # Carregar as vagas
     df_jobs, err = load_jobs(base_dir_default)
     if err:
-        st.error(err["error"])
-        st.stop()
-
+        st.error(err["error"]); st.stop()
     if df_jobs.empty:
-        st.warning("Nenhuma vaga carregada.")
-        st.stop()
+        st.warning("Nenhuma vaga carregada."); st.stop()
 
     jobs_indexed = df_jobs.set_index("job_id")
-    
+
+    # Abas: Sugestões primeiro (define a vaga); Formulário reusa a vaga escolhida
     if section is None:
         tab2, tab1 = st.tabs(["Sugestão de Candidatos", "Formulário e Predição"])
         with tab2:
@@ -269,13 +266,13 @@ def render_app(section: str | None = None) -> None:
         with tab1:
             sel_job = st.session_state.get("selected_job_id")
             if not sel_job or sel_job not in jobs_indexed.index:
-                st.info("Selecione uma vaga na aba **Sugestão de Candidatos** para habilitar o formulário.")
+                st.info("Selecione uma vaga na aba **Sugestão de Candidatos**.")
                 st.stop()
             sel_row = jobs_indexed.loc[sel_job]
             req_text_clean = str(sel_row.req_text_clean or "")
             _render_form(req_text_clean, sel_row, sel_job)
-
     elif section == "form":
+        # acesso direto ao formulário
         sel_job = st.session_state.get("selected_job_id")
         if not sel_job or sel_job not in jobs_indexed.index:
             st.info("Selecione uma vaga na aba **Sugestão de Candidatos**.")
@@ -283,7 +280,6 @@ def render_app(section: str | None = None) -> None:
         sel_row = jobs_indexed.loc[sel_job]
         req_text_clean = str(sel_row.req_text_clean or "")
         _render_form(req_text_clean, sel_row, sel_job)
-
     elif section == "sourcing":
         _render_sourcing()
     else:
@@ -779,35 +775,20 @@ def _render_sourcing() -> None:
         st.info("Nenhuma vaga encontrada na base.")
         return
 
-    # Seleção ÚNICA de vaga
+    # seletor único
     job_options_tab2 = jobs_tab2.index.tolist()
-    # coluna de título mais provável no seu DF é "titulo" (no seu load_jobs você preenche "titulo")
-    title_col = "titulo" if "titulo" in jobs_tab2.columns else (
-        "titulo_vaga" if "titulo_vaga" in jobs_tab2.columns else None
-    )
-
     def job_label(j):
         try:
-            parts = [str(j)]
-            if title_col:
-                parts.append(str(jobs_tab2.at[j, title_col]).strip())
-            cliente = str(jobs_tab2.at[j, "cliente"]).strip() if "cliente" in jobs_tab2.columns else ""
-            if cliente:
-                parts.append(cliente)
-            return " - ".join([p for p in parts if p])
+            titulo = str(jobs_tab2.at[j, "titulo"]) if "titulo" in jobs_tab2.columns else ""
+            cliente = str(jobs_tab2.at[j, "cliente"]) if "cliente" in jobs_tab2.columns else ""
+            return " - ".join([str(j)] + [x for x in [titulo, cliente] if x])
         except Exception:
             return str(j)
 
-    job_id_tab2 = st.selectbox(
-        "Selecione a vaga",
-        job_options_tab2,
-        format_func=job_label,
-    )
-
-    # Salvar seleção para ser usada na aba Formulário
+    job_id_tab2 = st.selectbox("Selecione a vaga", job_options_tab2, format_func=job_label)
     st.session_state["selected_job_id"] = job_id_tab2
 
-    # Threshold com fallback robusto
+    # threshold com fallback
     thr_default = 0.34
     try:
         meta = json.loads(Path("models/thresholds.json").read_text(encoding="utf-8"))
@@ -815,13 +796,9 @@ def _render_sourcing() -> None:
     except Exception:
         pass
 
-    threshold_tab2 = st.slider(
-        "Threshold (probabilidade mínima)",
-        0.0, 1.0, float(thr_default), 0.01
-    )
+    threshold_tab2 = st.slider("Threshold (probabilidade mínima)", 0.0, 1.0, float(thr_default), 0.01)
     max_results_tab2 = st.slider("Quantidade máxima de candidatos", 10, 200, 50, 10)
 
-    # Pool de candidatos livres
     available_candidates = apps_tab2.index.difference(prospect_ids_tab2)
     if available_candidates.empty:
         st.info("Nenhum candidato livre encontrado.")
@@ -840,12 +817,11 @@ def _render_sourcing() -> None:
             with st.spinner("Gerando recomendações..."):
                 scored = tab2_score_candidates(job_id_tab2, apps_tab2, jobs_tab2, available_candidates)
 
-            # ---- Resultado + "Vaga em análise" (depois) ----
-            titulo_txt = str(job_row.get(title_col, "")).strip() if title_col else ""
+            titulo_txt = str(job_row.get("titulo", "")).strip()
             cliente_txt = str(job_row.get("cliente", "")).strip()
             st.markdown(f"### Vaga {job_id_tab2}  {titulo_txt} {f'({cliente_txt})' if cliente_txt else ''}")
 
-            with st.expander("Requisitos da vaga", expanded=True):
+            with st.expander("Requisitos da vaga (CSV/Base)", expanded=True):
                 st.markdown(
                     f"- Inglês requerido: **{LEVELS[req_ing_ord]}**\n"
                     f"- Espanhol requerido: **{LEVELS[req_esp_ord]}**\n"
@@ -892,32 +868,9 @@ def _render_sourcing() -> None:
                 table = table.round({"Score (%)": 2})
             st.dataframe(table, width="stretch")
 
-            # download
-            csv = filtered_tab2.reset_index()[["candidate_id", "nome", "email", "telefone", "prob_percent"] + NUM_COLS]
-            st.download_button(
-                "Baixar CSV (tab Sugestões)",
-                csv.to_csv(index=False).encode("utf-8"),
-                file_name=f"sugestoes_tab2_vaga_{job_id_tab2}.csv",
-                mime="text/csv",
-            )
-
-            # ver CV
-            with st.expander("Ver currículo (cv_pt) de um candidato sugerido"):
-                selection = st.selectbox(
-                    "Candidato",
-                    filtered_tab2.index.tolist(),
-                    format_func=lambda cid: f"{cid}  {filtered_tab2.loc[cid, 'nome']}",
-                )
-                selected_cv = (
-                    filtered_tab2.loc[selection].get("cv_pt")
-                    or filtered_tab2.loc[selection].get("cv_text")
-                    or "(Currículo não disponível)"
-                )
-                st.text_area("currículo", value=selected_cv, height=280)
-
         except Exception as exc:
-            st.error("Falha ao gerar recomendações. Detalhes abaixo.")
-            st.exception(exc)  # mostra o stacktrace sem derrubar o app
+            st.error("Falha ao gerar recomendações.")
+            st.exception(exc)
 
 import numpy as np
 
