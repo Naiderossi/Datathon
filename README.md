@@ -8,6 +8,10 @@ Plataforma interativa em **Streamlit** para apoiar recrutadores na triagem de ta
 https://datathondecisiontalents.streamlit.app/
 ---
 
+## Link do video de apresentação
+https://drive.google.com/file/d/1rbzG1PEb0pQSH0CfTkMQBIrf6BPLf4mN/view?usp=sharing
+
+
 ## Sumário
 
 * [Arquitetura](#arquitetura)
@@ -192,3 +196,4 @@ key = "sua_chave"
 > Observação: o código só lê os segredos **quando necessário** (no momento de baixar dados), evitando falhas durante import.
 
 ---
+
