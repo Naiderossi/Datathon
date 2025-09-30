@@ -1,16 +1,20 @@
-﻿# Datathon Decision — Plataforma de Matching de Talentos
+# Datathon Decision — Plataforma de Matching de Talentos
 
 Plataforma interativa em **Streamlit** para apoiar recrutadores na triagem de talentos. O app calcula **probabilidade de aderência candidato–vaga** combinando texto do currículo e metadados estruturados, e oferece ferramentas de **recomendação, predição e análise**.
 
-
-
-## Link do streamlit  
-https://datathondecisiontalents.streamlit.app/
 ---
 
-## Link do video de apresentação
-https://drive.google.com/file/d/1rbzG1PEb0pQSH0CfTkMQBIrf6BPLf4mN/view?usp=sharing
+## Links
 
+### Link do streamlit
+
+[https://datathondecisiontalents.streamlit.app/](https://datathondecisiontalents.streamlit.app/)
+
+---
+
+### Link do vídeo de apresentação
+
+[https://drive.google.com/file/d/1rbzG1PEb0pQSH0CfTkMQBIrf6BPLf4mN/view?usp=sharing](https://drive.google.com/file/d/1rbzG1PEb0pQSH0CfTkMQBIrf6BPLf4mN/view?usp=sharing)
 
 ## Sumário
 
@@ -72,13 +76,27 @@ Optamos por uma combinação **TF‑IDF/LSA (SVD)** para representar textos + um
 * *Árvores/Boosting*: funcionam bem em tabulares, mas exigem engenharia para integrar texto denso; tendem a crescer em tamanho e tempo de inferência.
 * *Transformers (SBERT/e5) + Cross‑Encoder*: melhoram semântica e *recall* com embeddings, mas **custo operacional** e **latência** aumentam sem GPU. Mantivemos como **roadmap**.
 
-**Quando considerar trocar o modelo**
 
-* Volume grande, multilíngue ou alta ambiguidade semântica → adotar **sentence embeddings** (ex.: *e5‑base*, *all‑mpnet‑base‑v2*) com busca ANN (FAISS) + **re‑rank** por cross‑encoder.
-* Forte exigência de explicabilidade → modelos lineares com coeficientes interpretáveis, *per‑feature*; manter MLP para produção e um linear como *shadow model* explicativo.
-* Desejo de calibração probabilística estrita → aplicar **Platt scaling** ou **isotônica** após o MLP.
+### Métricas de referência
 
-> Em resumo: **MLP + LSA** entrega um ótimo equilíbrio entre **qualidade**, **custo** e **manutenibilidade** neste cenário, mantendo espaço aberto para evoluir a semântica com embeddings/cross‑encoders conforme a necessidade e capacidade de infra.
+>  
+
+| Métrica    | Valor | Observações                                       |
+| ---------- | ----- | ------------------------------------------------- |
+| Acurácia   | 65.7% | Test set (ex.: hold‑out 20% estratificado)        |
+| F1 (macro) | 64.3% | Threshold calibrado em `thr_f1` (thresholds.json) |
+
+**Notas**
+
+* Threshold ótimo (`best_threshold`): **0.3365**
+* F1 (classe positiva) no threshold ótimo: **71.4%**; F1 @ 0.50: **65.7%**
+* Acurácia global: **65.7%** (983 amostras no teste)
+
+**Metodologia sugerida**
+
+* Divisão **estratificada** em 80/20 (ou **5‑fold CV**), com *seed* fixa para reprodutibilidade.
+* Calibração do threshold para **F1** (valor salvo em `models/thresholds.json → mlp_thresholds.thr_f1`).
+* Reportar métricas **apenas** no conjunto de teste (nunca no treino).
 
 ---
 
@@ -86,15 +104,16 @@ Optamos por uma combinação **TF‑IDF/LSA (SVD)** para representar textos + um
 
 ### 1) **Sugestão de Candidatos** (principal)
 
-* **Um único seletor de vaga** baseado na base (sem upload de CSV nesta tela).
-* Sliders para **threshold mínimo** e **limite de resultados**.
+* **Um único seletor de vaga** baseado na base (sem upload de CSV nesta tela para reduzir processamento de página).
+* Sliders para **compatibilidade mínima** e **limite de resultados**.
 * Lista de candidatos recomendados com colunas úteis (idiomas, formação, sinais como PCD/SAP, *token overlap* e score).
 * Expansor com **requisitos da vaga** e **descrição**.
 * Ação para **download em CSV** da shortlist.
+* Possibilidade de melhorias utilizando automatização de envio de agendamentos de entrevistas.
 
 ### 2) **Formulário e Predição**
 
-* Formulário para compor/editar um perfil de candidato e **calcular o score de aderência** à vaga selecionada.
+* Formulário para compor/editar um perfil de candidato e **calcular o score de aderência** à vaga selecionada, pensando em uma entrevista ou analise de candidato guiada, a fim de padronizar os curriculos internos.
 * Exibição dos fatores/atributos que mais impactam no resultado (explicabilidade básica).
 
 ### 3) **Panorama Executivo (opcional, se habilitado)**
@@ -109,7 +128,7 @@ Optamos por uma combinação **TF‑IDF/LSA (SVD)** para representar textos + um
 
 ### Pré‑requisitos
 
-* **Python 3.10+** (3.11/3.12/3.13 também funcionam em CPU)
+* **Python 3.10+** 
 * `pip` e **virtualenv**/`venv`
 
 ### Passo a passo
@@ -125,14 +144,16 @@ Optamos por uma combinação **TF‑IDF/LSA (SVD)** para representar textos + um
 2. **Datasets**:
 
    * **Opção A – Kaggle**: configure as credenciais (ver seção de [Configurações](#configurações-kagglesecrets)). O app baixa o dataset automaticamente na primeira execução.
-   * **Opção B – Local**: coloque os arquivos equivalentes aos do dataset Kaggle em `datasets/` mantendo os **mesmos nomes**.
-3. **Modelos**: garanta que `models/data_pipeline.joblib`, `models/model_mlp_lsa.h5` e `models/thresholds.json` existam. (Para testes, estes podem vir versionados ou disponibilizados por link interno.)
+   * **Opção B – Local**: coloque os arquivos equivalentes aos do dataset Kaggle em `datasets/` mantendo os **mesmos nomes** : df_applicants.csv, df_jobs.csv, df_prospects.csv.
+3. **Modelos**: garanta que `models/data_pipeline.joblib`, `models/model_mlp_lsa.h5` e `models/thresholds.json` existam. 
 4. **Execute** o app:
 
    ```bash
    streamlit run app.py
-   # Caso o ponto de entrada seja o diretório do app multipágina:
-   # streamlit run datathon/Home.py
+   # Caso o ponto de entrada seja pelo app principal:
+   # streamlit run datathon/app.py
+   # Caso o ponto de entrada seja diretamente pela sugestão de candidatos:
+   # streamlit run datathon/app2.py
    ```
 5. Abra `http://localhost:8501` no navegador.
 
@@ -148,24 +169,29 @@ Optamos por uma combinação **TF‑IDF/LSA (SVD)** para representar textos + um
 ```text
 .
 ├── datathon/
-│   ├── Home.py                  # ponto de entrada (alternativo ao app.py)
+│   ├── src/            # utilitários de pré-processamento etc.
+|   |   ├── preprossesing.py
+|   |   ├── feature_engineering.py
+|   |   ├── evaluate.py
+|   |   ├── mlp_infer.py
+|   |   ├── model_utils.py
+|   |   ├── utils.py
+|   |   ├── train.py        
 │   ├── pages/
 │   │   ├── 1_Formulario_e_Predicao.py
-│   │   └── 2_Sugestao_de_Candidatos.py
-│   ├── talent_matching.py       # regras de negócio e renderização
-│   └── utils/                   # utilitários de pré-processamento etc.
-├── models/
-│   ├── data_pipeline.joblib
-│   ├── model_mlp_lsa.h5
-│   └── thresholds.json
-├── datasets/                    # (opcional) dados locais equivalentes ao Kaggle
+│   │   └── 2_Sugestao_de_Candidatos.py                  
+|   ├── models/
+│       ├── data_pipeline.joblib
+│       ├── model_mlp_lsa.h5
+│       └── thresholds.json
+|       └── training_report.json         
 ├── requirements.txt
-└── app.py                       # ponto de entrada (se existir na raiz)
+└── app.py                   # principal
+└── app2.py                  # alteranativa para rodar direto a sugestão de candidatos
+└── train_mlp.py
+└── talent_matching.py       # regras de negócio e renderização                     
 ```
 
-> A árvore acima é ilustrativa: ajuste conforme a estrutura real do repositório.
-
----
 
 ## Datasets e modelos
 
@@ -196,4 +222,10 @@ key = "sua_chave"
 > Observação: o código só lê os segredos **quando necessário** (no momento de baixar dados), evitando falhas durante import.
 
 ---
+## Dicas e possíveis problemas 
 
+* **Depreciação ************************************`use_container_width`**: prefira `width="stretch"` (ou `"content"`).
+* **TensorFlow CPU**: logs informam otimizações por instruções da CPU; não é erro.
+* **Colunas ausentes**: se atualizar os CSVs, mantenha colunas esperadas (`job_id`, `titulo`, campos de idiomas etc.).
+* **Falhas ao buscar recomendações**: verifique se os artefatos em `models/` existem e se o dataset possui candidatos/vagas suficientes.
+* **Crash da aplicação (datasets e data_pipeline exigem muito processamento e podem ultrapasar a cota do streamlit cloud), basta rebootar o app. Maiores análises e melhorias de perfomance podém ser executadas em outros sprints, reduzindo datasets, utilizando arquivos padronizados.. etc
